@@ -1,0 +1,27 @@
+Source: python-pecan
+Section: python
+Priority: optional
+Maintainer: PKG OpenStack <openstack-devel@lists.alioth.debian.org>
+Uploaders: Loic Dachary (OuoU) <loic@debian.org>,
+           Julien Danjou <acid@debian.org>,
+           Thomas Goirand <zigo@debian.org>,
+           Ghe Rivero <ghe.rivero@stackops.com>,
+           Mehdi Abaakouk <sileht@sileht.net>
+Build-Depends: debhelper (>= 9), python-setuptools,  python-all (>= 2.6.6-3~),
+ openstack-pkg-tools
+Standards-Version: 3.9.3
+Vcs-Browser: http://anonscm.debian.org/gitweb/?p=openstack/python-pecan.git
+Vcs-Git: git://anonscm.debian.org/openstack/python-pecan.git
+Homepage: https://github.com/dreamhost/pecan
+
+Package: python-pecan
+Architecture: all
+Pre-Depends: dpkg (>= 1.15.6~)
+Depends: ${python:Depends}, ${misc:Depends}
+Description: WSGI object-dispatching web framework
+ The Pecan Python module is a WSGI object-dispatching web framework designed to
+ be lean and fast with few dependencies. Pecan comes bundled with a lightweight
+ WSGI development server based on Python's wsgiref.simpleserver. Pecan
+ applications also come with an interactive Python shell which can be used to
+ execute expressions in an environment very similar to the one your application
+ runs in (using the "pecan shell" command).

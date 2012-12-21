@@ -1,0 +1,53 @@
+Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: pecan
+Source: git://github.com/dreamhost/pecan.git
+
+Files: debian/*
+Copyright: (c) 2012, Thomas Goirand <zigo@debian.org>
+License: BSD-3-clauses
+
+Files: *
+Copyright: (c) 2010-2012, Ryan Petrello <lists@ryanpetrello.com>
+	(c) 2010-2012, Mark McClain <mark.mcclain@shootq.com>
+	(c) 2010-2012, Alfredo Deza <alfredodeza@gmail.com>
+	(c) 2010-2012, Jonathan LaCour <jonathan@cleverdevil.org>
+	(c) 2010-2012, Yoann Roman <yoann@shootq.com>
+	(c) 2010-2012, Pete <pete@coderpete.net>
+	(c) 2010-2012, Jonathan LaCour <jonathan@dreamhost.com>
+	(c) 2010-2012, Jeremy M. Jones <jjones@pictage.com>
+	(c) 2010-2012, markmcclain <mark.mcclain@shootq.com>
+	(c) 2010-2012, cleverdevil <jonathan@cleverdevil.org>
+	(c) 2010-2012, markmcclain <mark@four-m.org>
+	(c) 2010-2012, Steven Berler <steven.berler@dreamhost.com>
+	(c) 2010-2012, Mark McClain <mark.mcclain@dreamhost.com>
+	(c) 2010-2012, Wesley Spikes <wesley.spikes@gmail.com>
+	(c) 2010-2012, Rick Copeland <rcopeland@geek.net>
+	(c) 2010-2012, Mike Perez <thingee@gmail.com>
+	(c) 2010-2012, John Anderson <sontek@gmail.com>
+	(c) 2010-2012, Benjamin W. Smith <bsmith@pictage.com>
+	(c) 2010-2012, barberj <barber.justin@gmail.com>
+License: BSD-3-clauses
+
+License: BSD-3-clauses
+ Redistribution and use in source and binary forms, with or without
+ modification, are permitted provided that the following conditions are met:
+ .
+  * Redistributions of source code must retain the above copyright
+    notice, this list of conditions and the following disclaimer.
+  * Redistributions in binary form must reproduce the above copyright notice,
+    this list of conditions and the following disclaimer in the documentation
+    and/or other materials provided with the distribution.
+  * Neither the name of the authors nor the names of its contributors may be
+    used to endorse or promote products derived from this software without
+    specific prior written permission.
+ .
+ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER BE LIABLE FOR ANY DIRECT,
+ INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+ OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
+ EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
