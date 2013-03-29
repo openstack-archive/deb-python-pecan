@@ -1,5 +1,4 @@
 import urllib
-import sys
 try:
     from simplejson import loads
 except ImportError:             # pragma: no cover
@@ -39,6 +38,11 @@ def proxy(key):
         def __delattr__(self, attr):
             obj = getattr(state, key)
             return delattr(obj, attr)
+
+        def __dir__(self):
+            obj = getattr(state, key)
+            return dir(obj)
+
     return ObjectProxy()
 
 
@@ -178,11 +182,15 @@ class Pecan(object):
                                 namespace automatically.
     :param force_canonical: A boolean indicating if this project should
                             require canonical URLs.
+    :param guess_content_type_from_ext: A boolean indicating if this project
+                            should use the extension in the URL for guessing
+                            the content type to return.
     '''
 
     def __init__(self, root, default_renderer='mako',
                  template_path='templates', hooks=[], custom_renderers={},
-                 extra_template_vars={}, force_canonical=True):
+                 extra_template_vars={}, force_canonical=True,
+                 guess_content_type_from_ext=True):
 
         if isinstance(root, basestring):
             root = self.__translate_root__(root)
@@ -193,6 +201,7 @@ class Pecan(object):
         self.hooks = hooks
         self.template_path = template_path
         self.force_canonical = force_canonical
+        self.guess_content_type_from_ext = guess_content_type_from_ext
 
     def __translate_root__(self, item):
         '''
@@ -308,7 +317,7 @@ class Pecan(object):
             valid_args = valid_args[len(args):]
 
         # handle wildcard arguments
-        if remainder:
+        if filter(None, remainder):
             if not argspec[1]:
                 abort(404)
             args.extend(remainder)
@@ -359,8 +368,9 @@ class Pecan(object):
         # get a sorted list of hooks, by priority (no controller hooks yet)
         state.hooks = self.determine_hooks()
 
-        # store the routing path to allow hooks to modify it
-        request.pecan['routing_path'] = request.path
+        # store the routing path for the current application to allow hooks to
+        # modify it
+        request.pecan['routing_path'] = request.path_info
 
         # handle "on_route" hooks
         self.handle_hooks('on_route', state)
@@ -368,13 +378,21 @@ class Pecan(object):
         # lookup the controller, respecting content-type as requested
         # by the file extension on the URI
         path = request.pecan['routing_path']
+        request.pecan['extension'] = None
 
         # attempt to guess the content type based on the file extension
-        if not request.pecan['content_type'] and '.' in path.split('/')[-1]:
-            path, extension = splitext(path)
-            request.pecan['extension'] = extension
+        if self.guess_content_type_from_ext \
+                and not request.pecan['content_type'] \
+                and '.' in path.split('/')[-1]:
+            new_path, extension = splitext(path)
+
             # preface with a letter to ensure compat for 2.5
-            request.pecan['content_type'] = guess_type('x' + extension)[0]
+            potential_type = guess_type('x' + extension)[0]
+
+            if potential_type is not None:
+                path = new_path
+                request.pecan['extension'] = extension
+                request.pecan['content_type'] = potential_type
 
         controller, remainder = self.route(self.root, path)
         cfg = _cfg(controller)

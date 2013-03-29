@@ -2,7 +2,7 @@ import sys
 from setuptools import setup, find_packages
 from setuptools.command.test import test as TestCommand
 
-version = '0.2.0b2'
+version = '0.2.1'
 
 #
 # determine requirements
@@ -31,7 +31,8 @@ tests_require = requirements + [
     'virtualenv',
     'Genshi',
     'Kajiki',
-    'Jinja'
+    'Jinja2',
+    'gunicorn'
 ]
 if sys.version_info < (2, 7):
     tests_require += ['unittest2']
@@ -102,5 +103,6 @@ setup(
     base = pecan.scaffolds:BaseScaffold
     [console_scripts]
     pecan = pecan.commands:CommandRunner.handle_command_line
+    gunicorn_pecan = pecan.commands.serve:gunicorn_run
     """
 )
