@@ -1,5 +1,5 @@
 python-pecan (0.2.1-1) experimental; urgency=low
 
-  * Initial release (Closes: #).
+  * Initial release (Closes: #704760).
 
  -- Thomas Goirand <zigo@debian.org>  Thu, 13 Dec 2012 06:31:35 +0000
