@@ -1,11 +1,14 @@
 import os
 import sys
-from unittest import TestCase
+
+from pecan.tests import PecanTestCase
+
+from mock import patch
 
 __here__ = os.path.dirname(__file__)
 
 
-class TestConf(TestCase):
+class TestConf(PecanTestCase):
 
     def test_update_config_fail_identifier(self):
         """Fail when naming does not pass correctness"""
@@ -110,22 +113,22 @@ class TestConf(TestCase):
         from pecan import configuration
         path = ('doesnotexist.py',)
         configuration.Config({})
-        self.assertRaises(IOError, configuration.conf_from_file, os.path.join(
-            __here__,
-            'config_fixtures',
-            *path
-        ))
+        self.assertRaises(
+            RuntimeError,
+            configuration.conf_from_file,
+            os.path.join(__here__, 'config_fixtures', *path)
+        )
 
     def test_config_missing_file_on_path(self):
         from pecan import configuration
         path = ('bad', 'bad', 'doesnotexist.py',)
         configuration.Config({})
 
-        self.assertRaises(IOError, configuration.conf_from_file, os.path.join(
-            __here__,
-            'config_fixtures',
-            *path
-        ))
+        self.assertRaises(
+            RuntimeError,
+            configuration.conf_from_file,
+            os.path.join(__here__, 'config_fixtures', *path)
+        )
 
     def test_config_with_syntax_error(self):
         from pecan import configuration
@@ -234,7 +237,7 @@ class TestConf(TestCase):
         assert to_dict['prefix_app']['prefix_template_path'] == ''
 
 
-class TestGlobalConfig(TestCase):
+class TestGlobalConfig(PecanTestCase):
 
     def tearDown(self):
         from pecan import configuration
@@ -274,6 +277,51 @@ class TestGlobalConfig(TestCase):
         )
         assert dict(configuration._runtime_conf) == {'foo': 'bar'}
 
-    def test_set_config_invalid_type(self):
+    def test_set_config_none_type(self):
         from pecan import configuration
-        self.assertRaises(TypeError, configuration.set_config, None)
+        self.assertRaises(RuntimeError, configuration.set_config, None)
+
+    def test_set_config_to_dir(self):
+        from pecan import configuration
+        self.assertRaises(RuntimeError, configuration.set_config, '/')
+
+
+class TestConfFromEnv(PecanTestCase):
+    #
+    # Note that there is a good chance of pollution if ``tearDown`` does not
+    # reset the configuration like this class does. If implementing new classes
+    # for configuration this tearDown **needs to be implemented**
+    #
+
+    def setUp(self):
+        super(TestConfFromEnv, self).setUp()
+        self.conf_from_env = self.get_conf_from_env()
+
+    def tearDown(self):
+        os.environ['PECAN_CONFIG'] = ''
+
+    def get_conf_from_env(self):
+        from pecan import configuration
+        return configuration.conf_from_env
+
+    def assertRaisesMessage(self, msg, exc, func, *args, **kwargs):
+        try:
+            func(*args, **kwargs)
+            self.assertFail()
+        except Exception as error:
+            assert issubclass(exc, error.__class__)
+            assert error.message == msg
+
+    @patch.dict('os.environ', {'PECAN_CONFIG': '/'})
+    def test_invalid_path(self):
+        msg = "PECAN_CONFIG was set to an invalid path: /"
+        self.assertRaisesMessage(msg, RuntimeError, self.conf_from_env)
+
+    def test_is_not_set(self):
+        msg = "PECAN_CONFIG is not set and " \
+              "no config file was passed as an argument."
+        self.assertRaisesMessage(msg, RuntimeError, self.conf_from_env)
+
+    @patch.dict('os.environ', {'PECAN_CONFIG': os.path.abspath(__file__)})
+    def test_return_valid_path(self):
+        assert self.conf_from_env() == os.path.abspath(__file__)
