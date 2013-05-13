@@ -1,4 +1,3 @@
-import urllib
 try:
     from simplejson import loads
 except ImportError:             # pragma: no cover
@@ -6,16 +5,19 @@ except ImportError:             # pragma: no cover
 from threading import local
 from itertools import chain
 from mimetypes import guess_type, add_type
-from urlparse import urlsplit, urlunsplit
 from os.path import splitext
 import logging
+import operator
+
+import six
 
 from webob import Request, Response, exc, acceptparse
 
-from templating import RendererFactory
-from routing import lookup_controller, NonCanonicalPath
-from util import _cfg, encode_if_needed
-from middleware.recursive import ForwardRequestException
+from .compat import urlparse, unquote_plus
+from .templating import RendererFactory
+from .routing import lookup_controller, NonCanonicalPath
+from .util import _cfg, encode_if_needed
+from .middleware.recursive import ForwardRequestException
 
 
 # make sure that json is defined in mimetypes
@@ -101,16 +103,16 @@ def redirect(location=None, internal=False, code=None, headers={},
 
     if add_slash:
         if location is None:
-            split_url = list(urlsplit(state.request.url))
+            split_url = list(urlparse.urlsplit(state.request.url))
             new_proto = state.request.environ.get(
                 'HTTP_X_FORWARDED_PROTO', split_url[0]
             )
             split_url[0] = new_proto
         else:
-            split_url = urlsplit(location)
+            split_url = urlparse.urlsplit(location)
 
         split_url[2] = split_url[2].rstrip('/') + '/'
-        location = urlunsplit(split_url)
+        location = urlparse.urlunsplit(split_url)
 
     if not headers:
         headers = {}
@@ -148,7 +150,7 @@ def load_app(config):
 
     returns a pecan.Pecan object
     '''
-    from configuration import _runtime_conf, set_config
+    from .configuration import _runtime_conf, set_config
     set_config(config, overwrite=True)
 
     for package_name in getattr(_runtime_conf.app, 'modules', []):
@@ -187,18 +189,27 @@ class Pecan(object):
                             the content type to return.
     '''
 
+    SIMPLEST_CONTENT_TYPES = (
+        ['text/html'],
+        ['text/plain']
+    )
+
     def __init__(self, root, default_renderer='mako',
                  template_path='templates', hooks=[], custom_renderers={},
                  extra_template_vars={}, force_canonical=True,
                  guess_content_type_from_ext=True):
 
-        if isinstance(root, basestring):
+        if isinstance(root, six.string_types):
             root = self.__translate_root__(root)
 
         self.root = root
         self.renderers = RendererFactory(custom_renderers, extra_template_vars)
         self.default_renderer = default_renderer
-        self.hooks = hooks
+        # pre-sort these so we don't have to do it per-request
+        self.hooks = list(sorted(
+            hooks,
+            key=operator.attrgetter('priority')
+        ))
         self.template_path = template_path
         self.force_canonical = force_canonical
         self.guess_content_type_from_ext = guess_content_type_from_ext
@@ -226,7 +237,7 @@ class Pecan(object):
 
         raise ImportError('No item named %s' % item)
 
-    def route(self, node, path):
+    def route(self, req, node, path):
         '''
         Looks up a controller from a node based upon the specified path.
 
@@ -238,17 +249,17 @@ class Pecan(object):
         try:
             node, remainder = lookup_controller(node, path)
             return node, remainder
-        except NonCanonicalPath, e:
+        except NonCanonicalPath as e:
             if self.force_canonical and \
                     not _cfg(e.controller).get('accept_noncanonical', False):
-                if request.method == 'POST':
+                if req.method == 'POST':
                     raise RuntimeError(
                         "You have POSTed to a URL '%s' which "
                         "requires a slash. Most browsers will not maintain "
                         "POST data when redirected. Please update your code "
                         "to POST to '%s/' or set force_canonical to False" %
-                        (request.pecan['routing_path'],
-                            request.pecan['routing_path'])
+                        (req.pecan['routing_path'],
+                            req.pecan['routing_path'])
                     )
                 redirect(code=302, add_slash=True)
             return e.controller, e.remainder
@@ -264,12 +275,14 @@ class Pecan(object):
         controller_hooks = []
         if controller:
             controller_hooks = _cfg(controller).get('hooks', [])
-        return list(
-            sorted(
-                chain(controller_hooks, self.hooks),
-                lambda x, y: cmp(x.priority, y.priority)
-            )
-        )
+            if controller_hooks:
+                return list(
+                    sorted(
+                        chain(controller_hooks, self.hooks),
+                        key=operator.attrgetter('priority')
+                    )
+                )
+        return self.hooks
 
     def handle_hooks(self, hook_type, *args):
         '''
@@ -288,7 +301,7 @@ class Pecan(object):
         for hook in hooks:
             getattr(hook, hook_type)(*args)
 
-    def get_args(self, all_params, remainder, argspec, im_self):
+    def get_args(self, req, all_params, remainder, argspec, im_self):
         '''
         Determines the arguments for a controller based upon parameters
         passed the argument specification for the controller.
@@ -298,7 +311,8 @@ class Pecan(object):
         valid_args = argspec[0][1:]
 
         def _decode(x):
-            return urllib.unquote_plus(x) if isinstance(x, basestring) else x
+            return unquote_plus(x) if isinstance(x, six.string_types) \
+                else x
 
         remainder = [_decode(x) for x in remainder]
 
@@ -306,9 +320,9 @@ class Pecan(object):
             args.append(im_self)
 
         # grab the routing args from nested REST controllers
-        if 'routing_args' in request.pecan:
-            remainder = request.pecan['routing_args'] + list(remainder)
-            del request.pecan['routing_args']
+        if 'routing_args' in req.pecan:
+            remainder = req.pecan['routing_args'] + list(remainder)
+            del req.pecan['routing_args']
 
         # handle positional arguments
         if valid_args and remainder:
@@ -317,7 +331,7 @@ class Pecan(object):
             valid_args = valid_args[len(args):]
 
         # handle wildcard arguments
-        if filter(None, remainder):
+        if [i for i in remainder if i]:
             if not argspec[1]:
                 abort(404)
             args.extend(remainder)
@@ -339,7 +353,7 @@ class Pecan(object):
 
         # handle wildcard GET/POST params
         if argspec[2]:
-            for name, value in all_params.iteritems():
+            for name, value in six.iteritems(all_params):
                 if name not in argspec[0]:
                     kwargs[encode_if_needed(name)] = value
 
@@ -360,29 +374,29 @@ class Pecan(object):
             template = template.split(':')[1]
         return renderer.render(template, namespace)
 
-    def handle_request(self):
+    def handle_request(self, req, resp):
         '''
         The main request handler for Pecan applications.
         '''
 
         # get a sorted list of hooks, by priority (no controller hooks yet)
-        state.hooks = self.determine_hooks()
+        state.hooks = self.hooks
 
         # store the routing path for the current application to allow hooks to
         # modify it
-        request.pecan['routing_path'] = request.path_info
+        req.pecan['routing_path'] = req.path_info
 
         # handle "on_route" hooks
         self.handle_hooks('on_route', state)
 
         # lookup the controller, respecting content-type as requested
         # by the file extension on the URI
-        path = request.pecan['routing_path']
-        request.pecan['extension'] = None
+        path = req.pecan['routing_path']
+        req.pecan['extension'] = None
 
         # attempt to guess the content type based on the file extension
         if self.guess_content_type_from_ext \
-                and not request.pecan['content_type'] \
+                and not req.pecan['content_type'] \
                 and '.' in path.split('/')[-1]:
             new_path, extension = splitext(path)
 
@@ -391,10 +405,10 @@ class Pecan(object):
 
             if potential_type is not None:
                 path = new_path
-                request.pecan['extension'] = extension
-                request.pecan['content_type'] = potential_type
+                req.pecan['extension'] = extension
+                req.pecan['content_type'] = potential_type
 
-        controller, remainder = self.route(self.root, path)
+        controller, remainder = self.route(req, self.root, path)
         cfg = _cfg(controller)
 
         if cfg.get('generic_handler'):
@@ -403,23 +417,32 @@ class Pecan(object):
         # handle generic controllers
         im_self = None
         if cfg.get('generic'):
-            im_self = controller.im_self
+            im_self = six.get_method_self(controller)
             handlers = cfg['generic_handlers']
-            controller = handlers.get(request.method, handlers['DEFAULT'])
+            controller = handlers.get(req.method, handlers['DEFAULT'])
             cfg = _cfg(controller)
 
         # add the controller to the state so that hooks can use it
         state.controller = controller
 
         # if unsure ask the controller for the default content type
-        if not request.pecan['content_type']:
+        content_types = cfg.get('content_types', {})
+        if not req.pecan['content_type']:
             # attempt to find a best match based on accept headers (if they
             # exist)
-            if 'Accept' in request.headers:
+            accept = req.headers.get('Accept', '*/*')
+            if accept == '*/*' or (
+                    accept.startswith('text/html,') and
+                    list(content_types.keys()) in self.SIMPLEST_CONTENT_TYPES):
+                req.pecan['content_type'] = cfg.get(
+                    'content_type',
+                    'text/html'
+                )
+            else:
                 best_default = acceptparse.MIMEAccept(
-                    request.headers['Accept']
+                    accept
                 ).best_match(
-                    cfg.get('content_types', {}).keys()
+                    content_types.keys()
                 )
 
                 if best_default is None:
@@ -428,29 +451,24 @@ class Pecan(object):
                     logger.error(
                         msg % (
                             controller.__name__,
-                            request.pecan['content_type'],
-                            cfg.get('content_types', {}).keys()
+                            req.pecan['content_type'],
+                            content_types.keys()
                         )
                     )
                     raise exc.HTTPNotAcceptable()
 
-                request.pecan['content_type'] = best_default
-            else:
-                request.pecan['content_type'] = cfg.get(
-                    'content_type',
-                    'text/html'
-                )
+                req.pecan['content_type'] = best_default
         elif cfg.get('content_type') is not None and \
-                request.pecan['content_type'] not in \
-                cfg.get('content_types', {}):
+                req.pecan['content_type'] not in \
+                content_types:
 
             msg = "Controller '%s' defined does not support content_type " + \
                   "'%s'. Supported type(s): %s"
             logger.error(
                 msg % (
                     controller.__name__,
-                    request.pecan['content_type'],
-                    cfg.get('content_types', {}).keys()
+                    req.pecan['content_type'],
+                    content_types.keys()
                 )
             )
             raise exc.HTTPNotFound
@@ -462,10 +480,11 @@ class Pecan(object):
         self.handle_hooks('before', state)
 
         # fetch any parameters
-        params = dict(request.params)
+        params = dict(req.params)
 
         # fetch the arguments for the controller
         args, kwargs = self.get_args(
+            req,
             params,
             remainder,
             cfg['argspec'],
@@ -483,43 +502,40 @@ class Pecan(object):
         raw_namespace = result
 
         # pull the template out based upon content type and handle overrides
-        template = cfg.get('content_types', {}).get(
-            request.pecan['content_type']
+        template = content_types.get(
+            req.pecan['content_type']
         )
 
         # check if for controller override of template
-        template = request.pecan.get('override_template', template)
-        request.pecan['content_type'] = request.pecan.get(
+        template = req.pecan.get('override_template', template)
+        req.pecan['content_type'] = req.pecan.get(
             'override_content_type',
-            request.pecan['content_type']
+            req.pecan['content_type']
         )
 
         # if there is a template, render it
         if template:
             if template == 'json':
-                request.pecan['content_type'] = 'application/json'
+                req.pecan['content_type'] = 'application/json'
             result = self.render(template, result)
-
-        if 'pecan.params' in request.environ:
-            params = request.environ.pop('pecan.params')
 
         # If we are in a test request put the namespace where it can be
         # accessed directly
-        if request.environ.get('paste.testing'):
-            testing_variables = request.environ['paste.testing_variables']
+        if req.environ.get('paste.testing'):
+            testing_variables = req.environ['paste.testing_variables']
             testing_variables['namespace'] = raw_namespace
             testing_variables['template_name'] = template
             testing_variables['controller_output'] = result
 
         # set the body content
-        if isinstance(result, unicode):
-            response.unicode_body = result
+        if isinstance(result, six.text_type):
+            resp.text = result
         else:
-            response.body = result
+            resp.body = result
 
         # set the content type
-        if request.pecan['content_type']:
-            response.content_type = request.pecan['content_type']
+        if req.pecan['content_type']:
+            resp.content_type = req.pecan['content_type']
 
     def __call__(self, environ, start_response):
         '''
@@ -540,11 +556,12 @@ class Pecan(object):
             state.request.context = {}
             state.request.pecan = dict(content_type=None)
 
-            self.handle_request()
-        except Exception, e:
+            self.handle_request(state.request, state.response)
+        except Exception as e:
             # if this is an HTTP Exception, set it as the response
             if isinstance(e, exc.HTTPException):
                 state.response = e
+                environ['pecan.original_exception'] = e
 
             # if this is not an internal redirect, run error hooks
             if not isinstance(e, ForwardRequestException):

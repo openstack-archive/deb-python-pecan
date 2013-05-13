@@ -2,6 +2,8 @@ import re
 import inspect
 import os
 
+import six
+
 
 IDENTIFIER = re.compile(r'[a-z_](\w)*$', re.IGNORECASE)
 
@@ -56,7 +58,7 @@ class Config(object):
         '''
 
         if isinstance(conf_dict, dict):
-            iterator = conf_dict.iteritems()
+            iterator = six.iteritems(conf_dict)
         else:
             iterator = iter(conf_dict)
 
@@ -81,7 +83,7 @@ class Config(object):
         '''
         Private helper method for to_dict.
         '''
-        for k, v in obj.items():
+        for k, v in obj.copy().items():
             if prefix:
                 del obj[k]
                 k = "%s%s" % (prefix, k)
@@ -118,21 +120,21 @@ class Config(object):
                 self.__values__[key] = ConfigDict(value)
             else:
                 self.__values__[key] = Config(value, filename=self.__file__)
-        elif isinstance(value, basestring) and '%(confdir)s' in value:
+        elif isinstance(value, six.string_types) and '%(confdir)s' in value:
             confdir = os.path.dirname(self.__file__) or os.getcwd()
             self.__values__[key] = value.replace('%(confdir)s', confdir)
         else:
             self.__values__[key] = value
 
     def __iter__(self):
-        return self.__values__.iteritems()
+        return six.iteritems(self.__values__)
 
     def __dir__(self):
         """
         When using dir() returns a list of the values in the config.  Note:
         This function only works in Python2.6 or later.
         """
-        return self.__values__.keys()
+        return list(self.__values__.keys())
 
     def __repr__(self):
         return 'Config(%s)' % str(self.__values__)
@@ -150,29 +152,29 @@ def conf_from_file(filepath):
     if not os.path.isfile(abspath):
         raise RuntimeError('`%s` is not a file.' % abspath)
 
-    execfile(abspath, globals(), conf_dict)
+    with open(abspath, 'rb') as f:
+        exec(compile(f.read(), abspath, 'exec'), globals(), conf_dict)
     conf_dict['__file__'] = abspath
 
     return conf_from_dict(conf_dict)
 
 
-def conf_from_env():
+def get_conf_path_from_env():
     '''
     If the ``PECAN_CONFIG`` environment variable exists and it points to
     a valid path it will return that, otherwise it will raise
     a ``RuntimeError``.
     '''
     config_path = os.environ.get('PECAN_CONFIG')
-    error = None
     if not config_path:
         error = "PECAN_CONFIG is not set and " \
                 "no config file was passed as an argument."
     elif not os.path.isfile(config_path):
         error = "PECAN_CONFIG was set to an invalid path: %s" % config_path
+    else:
+        return config_path
 
-    if error:
-        raise RuntimeError(error)
-    return config_path
+    raise RuntimeError(error)
 
 
 def conf_from_dict(conf_dict):
@@ -183,7 +185,7 @@ def conf_from_dict(conf_dict):
     '''
     conf = Config(filename=conf_dict.get('__file__', ''))
 
-    for k, v in conf_dict.iteritems():
+    for k, v in six.iteritems(conf_dict):
         if k.startswith('__'):
             continue
         elif inspect.ismodule(v):
@@ -209,13 +211,14 @@ def set_config(config, overwrite=False):
                    which represents a (relative) configuration filename.
     '''
 
+    if config is None:
+        config = get_conf_path_from_env()
+
+    # must be after the fallback other a bad fallback will incorrectly clear
     if overwrite is True:
         _runtime_conf.empty()
 
-    if config is None:
-        config = conf_from_env()
-
-    if isinstance(config, basestring):
+    if isinstance(config, six.string_types):
         config = conf_from_file(config)
         _runtime_conf.update(config)
         if config.__file__:

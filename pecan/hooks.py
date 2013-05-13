@@ -3,8 +3,8 @@ from inspect import getmembers
 
 from webob.exc import HTTPFound
 
-from util import iscontroller, _cfg
-from routing import lookup_controller
+from .util import iscontroller, _cfg
+from .routing import lookup_controller
 
 __all__ = [
     'PecanHook', 'TransactionHook', 'HookController',
@@ -29,18 +29,27 @@ def walk_controller(root_class, controller, hooks):
                 walk_controller(root_class, value, hooks)
 
 
-class HookController(object):
+class HookControllerMeta(type):
     '''
     A base class for controllers that would like to specify hooks on
     their controller methods. Simply create a list of hook objects
     called ``__hooks__`` as a member of the controller's namespace.
     '''
 
-    __hooks__ = []
+    def __init__(cls, name, bases, dict_):
+        walk_controller(cls, cls, dict_.get('__hooks__', []))
 
-    class __metaclass__(type):
-        def __init__(cls, name, bases, dict_):
-            walk_controller(cls, cls, dict_['__hooks__'])
+
+'''
+A base class for controllers that would like to specify hooks on
+their controller methods. Simply create a list of hook objects
+called ``__hooks__`` as a member of the controller's namespace.
+'''
+HookController = HookControllerMeta(
+    'HookController',
+    (object,),
+    {}
+)
 
 
 class PecanHook(object):
@@ -144,7 +153,8 @@ class TransactionHook(PecanHook):
             self.start_ro()
 
     def before(self, state):
-        if self.is_transactional(state) and not state.request.transactional:
+        if self.is_transactional(state) \
+                and not getattr(state.request, 'transactional', False):
             self.clear()
             state.request.transactional = True
             self.start()
@@ -170,7 +180,7 @@ class TransactionHook(PecanHook):
         state.request.error = True
 
     def after(self, state):
-        if state.request.transactional:
+        if getattr(state.request, 'transactional', False):
             action_name = None
             if state.request.error:
                 action_name = 'after_rollback'
@@ -303,7 +313,7 @@ class RequestViewerHook(PecanHook):
                     value = getattr(state.request, request_info)
                 else:
                     value = value(self, state)
-            except Exception, e:
+            except Exception as e:
                 value = e
 
             terminal.append('%-12s - %s\n' % (request_info, value))

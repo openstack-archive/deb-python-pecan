@@ -1,9 +1,8 @@
-from cStringIO import StringIO
-
 from webtest import TestApp
+from six import b as b_
+from six.moves import cStringIO as StringIO
 
 from pecan import make_app, expose, redirect, abort
-from pecan.core import state
 from pecan.hooks import (
     PecanHook, TransactionHook, HookController, RequestViewerHook
 )
@@ -39,7 +38,7 @@ class TestHooks(PecanTestCase):
         app = TestApp(make_app(RootController(), hooks=[SimpleHook()]))
         response = app.get('/')
         assert response.status_int == 200
-        assert response.body == 'Hello, World!'
+        assert response.body == b_('Hello, World!')
 
         assert len(run_hook) == 4
         assert run_hook[0] == 'on_route'
@@ -77,7 +76,7 @@ class TestHooks(PecanTestCase):
         ]))
         response = app.get('/')
         assert response.status_int == 200
-        assert response.body == 'Hello, World!'
+        assert response.body == b_('Hello, World!')
 
         assert len(run_hook) == 10
         assert run_hook[0] == 'on_route1'
@@ -118,7 +117,7 @@ class TestHooks(PecanTestCase):
 
         response = app.get('/')
         assert response.status_int == 200
-        assert response.body == 'Hello World!'
+        assert response.body == b_('Hello World!')
 
         assert len(run_hook) == 2
         assert run_hook[0] == 'on_route'
@@ -127,7 +126,7 @@ class TestHooks(PecanTestCase):
         run_hook = []
         try:
             response = app.get('/causeerror')
-        except Exception, e:
+        except Exception as e:
             assert isinstance(e, IndexError)
 
         assert len(run_hook) == 2
@@ -144,8 +143,10 @@ class TestHooks(PecanTestCase):
                 return 'Hello, World!'
 
         class SimpleHook(PecanHook):
-            def __init__(self, id):
+            def __init__(self, id, priority=None):
                 self.id = str(id)
+                if priority:
+                    self.priority = priority
 
             def on_route(self, state):
                 run_hook.append('on_route' + self.id)
@@ -160,34 +161,12 @@ class TestHooks(PecanTestCase):
                 run_hook.append('error' + self.id)
 
         papp = make_app(RootController(), hooks=[
-            SimpleHook(1), SimpleHook(2), SimpleHook(3)
+            SimpleHook(1, 3), SimpleHook(2, 2), SimpleHook(3, 1)
         ])
         app = TestApp(papp)
         response = app.get('/')
         assert response.status_int == 200
-        assert response.body == 'Hello, World!'
-
-        assert len(run_hook) == 10
-        assert run_hook[0] == 'on_route1'
-        assert run_hook[1] == 'on_route2'
-        assert run_hook[2] == 'on_route3'
-        assert run_hook[3] == 'before1'
-        assert run_hook[4] == 'before2'
-        assert run_hook[5] == 'before3'
-        assert run_hook[6] == 'inside'
-        assert run_hook[7] == 'after3'
-        assert run_hook[8] == 'after2'
-        assert run_hook[9] == 'after1'
-
-        run_hook = []
-
-        state.app.hooks[0].priority = 3
-        state.app.hooks[1].priority = 2
-        state.app.hooks[2].priority = 1
-
-        response = app.get('/')
-        assert response.status_int == 200
-        assert response.body == 'Hello, World!'
+        assert response.body == b_('Hello, World!')
 
         assert len(run_hook) == 10
         assert run_hook[0] == 'on_route3'
@@ -244,7 +223,7 @@ class TestHooks(PecanTestCase):
         app = TestApp(make_app(RootController()))
         response = app.get('/')
         assert response.status_int == 200
-        assert response.body == 'Hello, World!'
+        assert response.body == b_('Hello, World!')
 
         assert len(run_hook) == 1
         assert run_hook[0] == 'inside'
@@ -253,7 +232,7 @@ class TestHooks(PecanTestCase):
 
         response = app.get('/sub/')
         assert response.status_int == 200
-        assert response.body == 'Inside here!'
+        assert response.body == b_('Inside here!')
 
         assert len(run_hook) == 3
         assert run_hook[0] == 'before'
@@ -263,7 +242,7 @@ class TestHooks(PecanTestCase):
         run_hook = []
         response = app.get('/sub/sub/')
         assert response.status_int == 200
-        assert response.body == 'Deep inside here!'
+        assert response.body == b_('Deep inside here!')
 
         assert len(run_hook) == 3
         assert run_hook[0] == 'before'
@@ -308,7 +287,7 @@ class TestHooks(PecanTestCase):
         app = TestApp(make_app(RootController(), hooks=[SimpleHook(1)]))
         response = app.get('/')
         assert response.status_int == 200
-        assert response.body == 'Hello, World!'
+        assert response.body == b_('Hello, World!')
 
         assert len(run_hook) == 4
         assert run_hook[0] == 'on_route1'
@@ -320,7 +299,7 @@ class TestHooks(PecanTestCase):
 
         response = app.get('/sub/')
         assert response.status_int == 200
-        assert response.body == 'Inside here!'
+        assert response.body == b_('Inside here!')
 
         assert len(run_hook) == 6
         assert run_hook[0] == 'on_route1'
@@ -364,7 +343,7 @@ class TestTransactionHook(PecanTestCase):
 
         response = app.get('/')
         assert response.status_int == 200
-        assert response.body == 'Hello, World!'
+        assert response.body == b_('Hello, World!')
 
         assert len(run_hook) == 3
         assert run_hook[0] == 'start_ro'
@@ -375,7 +354,7 @@ class TestTransactionHook(PecanTestCase):
 
         response = app.post('/')
         assert response.status_int == 200
-        assert response.body == 'Hello, World!'
+        assert response.body == b_('Hello, World!')
 
         assert len(run_hook) == 4
         assert run_hook[0] == 'start'
@@ -470,7 +449,7 @@ class TestTransactionHook(PecanTestCase):
 
         response = app.get('/')
         assert response.status_int == 200
-        assert response.body == 'Index Method!'
+        assert response.body == b_('Index Method!')
 
         assert len(run_hook) == 3
         assert run_hook[0] == 'start_ro'
@@ -481,7 +460,7 @@ class TestTransactionHook(PecanTestCase):
 
         response = app.post('/')
         assert response.status_int == 200
-        assert response.body == 'Index Method!'
+        assert response.body == b_('Index Method!')
 
         assert len(run_hook) == 5
         assert run_hook[0] == 'start'
@@ -494,7 +473,7 @@ class TestTransactionHook(PecanTestCase):
 
         response = app.get('/decorated')
         assert response.status_int == 200
-        assert response.body == 'Decorated Method!'
+        assert response.body == b_('Decorated Method!')
 
         assert len(run_hook) == 7
         assert run_hook[0] == 'start_ro'
@@ -599,7 +578,7 @@ class TestTransactionHook(PecanTestCase):
 
         response = app.get('/')
         assert response.status_int == 200
-        assert response.body == 'Hello, World!'
+        assert response.body == b_('Hello, World!')
 
         assert len(run_hook) == 3
         assert run_hook[0] == 'start_ro'
@@ -612,7 +591,7 @@ class TestTransactionHook(PecanTestCase):
 
         response = app.post('/')
         assert response.status_int == 200
-        assert response.body == 'Hello, World!'
+        assert response.body == b_('Hello, World!')
 
         assert len(run_hook) == 4
         assert run_hook[0] == 'start'
@@ -842,7 +821,7 @@ class TestTransactionHook(PecanTestCase):
 
         response = app.get('/')
         assert response.status_int == 200
-        assert response.body == 'Hello, World!'
+        assert response.body == b_('Hello, World!')
 
         assert len(run_hook) == 6
         assert run_hook[0] == 'start_ro'
@@ -858,7 +837,7 @@ class TestTransactionHook(PecanTestCase):
 
         response = app.post('/')
         assert response.status_int == 200
-        assert response.body == 'Hello, World!'
+        assert response.body == b_('Hello, World!')
 
         assert len(run_hook) == 4
         assert run_hook[0] == 'start'
@@ -967,7 +946,7 @@ class TestTransactionHook(PecanTestCase):
 
         response = app.get('/generic')
         assert response.status_int == 200
-        assert response.body == 'generic get'
+        assert response.body == b_('generic get')
         assert len(run_hook) == 6
         assert run_hook[0] == 'start_ro'
         assert run_hook[1] == 'clear'
@@ -985,12 +964,55 @@ class TestTransactionHook(PecanTestCase):
 
         response = app.post('/generic')
         assert response.status_int == 200
-        assert response.body == 'generic post'
+        assert response.body == b_('generic post')
         assert len(run_hook) == 4
         assert run_hook[0] == 'start'
         assert run_hook[1] == 'inside'
         assert run_hook[2] == 'commit'
         assert run_hook[3] == 'clear'
+
+    def test_transaction_hook_with_broken_hook(self):
+        """
+        In a scenario where a preceding hook throws an exception,
+        ensure that TransactionHook still rolls back properly.
+        """
+        run_hook = []
+
+        class RootController(object):
+            @expose()
+            def index(self):
+                return 'Hello, World!'
+
+        def gen(event):
+            return lambda: run_hook.append(event)
+
+        class MyCustomException(Exception):
+            pass
+
+        class MyHook(PecanHook):
+
+            def on_route(self, state):
+                raise MyCustomException('BROKEN!')
+
+        app = TestApp(make_app(RootController(), hooks=[
+            MyHook(),
+            TransactionHook(
+                start=gen('start'),
+                start_ro=gen('start_ro'),
+                commit=gen('commit'),
+                rollback=gen('rollback'),
+                clear=gen('clear')
+            )
+        ]))
+
+        self.assertRaises(
+            MyCustomException,
+            app.get,
+            '/'
+        )
+
+        assert len(run_hook) == 1
+        assert run_hook[0] == 'clear'
 
 
 class TestRequestViewerHook(PecanTestCase):
@@ -1029,7 +1051,7 @@ class TestRequestViewerHook(PecanTestCase):
         out = _stdout.getvalue()
 
         assert response.status_int == 200
-        assert response.body == 'Hello, World!'
+        assert response.body == b_('Hello, World!')
         assert 'path' in out
         assert 'method' in out
         assert 'status' in out
@@ -1094,7 +1116,7 @@ class TestRequestViewerHook(PecanTestCase):
         out = _stdout.getvalue()
 
         assert response.status_int == 200
-        assert response.body == 'Hello, World!'
+        assert response.body == b_('Hello, World!')
         assert '/' in out
         assert 'path' in out
         assert 'method' not in out
@@ -1129,7 +1151,7 @@ class TestRequestViewerHook(PecanTestCase):
         out = _stdout.getvalue()
 
         assert response.status_int == 200
-        assert response.body == 'Hello, World!'
+        assert response.body == b_('Hello, World!')
         assert out == ''
 
     def test_item_not_in_defaults(self):
@@ -1156,7 +1178,7 @@ class TestRequestViewerHook(PecanTestCase):
         out = _stdout.getvalue()
 
         assert response.status_int == 200
-        assert response.body == 'Hello, World!'
+        assert response.body == b_('Hello, World!')
         assert 'date' in out
         assert 'method' not in out
         assert 'status' not in out
