@@ -1,3 +1,10 @@
+python-pecan (0.3.0-1) unstable; urgency=low
+
+  * Uploading to unstable.
+  * New upstream release.
+
+ -- Thomas Goirand <zigo@debian.org>  Mon, 13 May 2013 07:49:09 +0000
+
 python-pecan (0.2.2-1) experimental; urgency=low
 
   * Initial release (Closes: #704760).
