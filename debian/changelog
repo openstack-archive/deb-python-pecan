@@ -1,3 +1,11 @@
+python-pecan (0.3.0-2) unstable; urgency=low
+
+  * Removes ${python:Depends} and writes dependencies by hand, as under wheezy,
+    python-logutils is added automatically despite the fact it isn't needed,
+    and I wish to build a backport.
+
+ -- Thomas Goirand <zigo@debian.org>  Sat, 18 May 2013 07:41:03 +0000
+
 python-pecan (0.3.0-1) unstable; urgency=low
 
   * Uploading to unstable.

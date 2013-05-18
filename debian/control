@@ -17,7 +17,7 @@ Homepage: http://pypi.python.org/pypi/pecan
 Package: python-pecan
 Architecture: all
 Pre-Depends: dpkg (>= 1.15.6~)
-Depends: ${python:Depends}, ${misc:Depends}, python-markupsafe, python-simplegeneric
+Depends: ${misc:Depends}, python (>= 2.6.6-7~), python (<< 2.8), python-webob, python-simplegeneric, python-mako (>= 0.4.0), python-webtest, python-six, python-logutils, python-argparse, python-markupsafe
 Description: WSGI object-dispatching web framework
  The Pecan Python module is a WSGI object-dispatching web framework designed to
  be lean and fast with few dependencies. Pecan comes bundled with a lightweight
