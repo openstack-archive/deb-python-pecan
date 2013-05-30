@@ -7,8 +7,10 @@ Uploaders: Loic Dachary (OuoU) <loic@debian.org>,
            Thomas Goirand <zigo@debian.org>,
            Ghe Rivero <ghe.rivero@stackops.com>,
            Mehdi Abaakouk <sileht@sileht.net>
-Build-Depends: debhelper (>= 9), python-setuptools,  python-all (>= 2.6.6-3~),
- openstack-pkg-tools
+Build-Depends: debhelper (>= 9),
+               openstack-pkg-tools,
+               python-all (>= 2.6.6-3~),
+               python-setuptools
 Standards-Version: 3.9.3
 Vcs-Browser: http://anonscm.debian.org/gitweb/?p=openstack/python-pecan.git
 Vcs-Git: git://anonscm.debian.org/openstack/python-pecan.git
@@ -17,7 +19,16 @@ Homepage: http://pypi.python.org/pypi/pecan
 Package: python-pecan
 Architecture: all
 Pre-Depends: dpkg (>= 1.15.6~)
-Depends: ${misc:Depends}, python (>= 2.6.6-7~), python (<< 2.8), python-webob, python-simplegeneric, python-mako (>= 0.4.0), python-webtest, python-six, python-argparse, python-markupsafe
+Depends: python (<< 2.8),
+         python (>= 2.6.6-7~),
+         python-argparse,
+         python-mako (>= 0.4.0),
+         python-markupsafe,
+         python-simplegeneric,
+         python-six,
+         python-webob,
+         python-webtest,
+         ${misc:Depends}
 Description: WSGI object-dispatching web framework
  The Pecan Python module is a WSGI object-dispatching web framework designed to
  be lean and fast with few dependencies. Pecan comes bundled with a lightweight
