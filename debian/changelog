@@ -4,6 +4,8 @@ python-pecan (0.3.0-2) UNRELEASED; urgency=low
     python-logutils is added automatically despite the fact it isn't needed,
     and I wish to build a backport.
   * Ran wrap-and-sort.
+  * Updates debian/copyright and debian/rules for the new
+    github.com/stackforge/pecan.git URL.
 
  -- Thomas Goirand <zigo@debian.org>  Sat, 18 May 2013 07:41:03 +0000
 

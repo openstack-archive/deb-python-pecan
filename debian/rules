@@ -1,9 +1,6 @@
 #!/usr/bin/make -f
 
-#export DH_VERBOSE=1
-
-UPSTREAM_GIT = git://github.com/dreamhost/pecan.git
-
+UPSTREAM_GIT = git://github.com/stackforge/pecan.git
 include /usr/share/openstack-pkg-tools/pkgos.make
 
 %:
