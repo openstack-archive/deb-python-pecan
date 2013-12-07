@@ -1,4 +1,4 @@
-python-pecan (0.3.0-2) UNRELEASED; urgency=low
+python-pecan (0.4.2-1) UNRELEASED; urgency=medium
 
   * Removes ${python:Depends} and writes dependencies by hand, as under wheezy,
     python-logutils is added automatically despite the fact it isn't needed,
@@ -7,7 +7,7 @@ python-pecan (0.3.0-2) UNRELEASED; urgency=low
   * Updates debian/copyright and debian/rules for the new
     github.com/stackforge/pecan.git URL.
 
- -- Thomas Goirand <zigo@debian.org>  Sat, 18 May 2013 07:41:03 +0000
+ -- Thomas Goirand <zigo@debian.org>  Sat, 07 Dec 2013 17:23:19 +0800
 
 python-pecan (0.3.0-1) unstable; urgency=low
 
