@@ -33,6 +33,23 @@ class TestAppRoot(PecanTestCase):
         assert app.root and isinstance(app.root, SampleRootController)
 
 
+class TestEmptyContent(PecanTestCase):
+    @property
+    def app_(self):
+        class RootController(object):
+            @expose()
+            def index(self):
+                pass
+
+        return TestApp(Pecan(RootController()))
+
+    def test_empty_index(self):
+        r = self.app_.get('/')
+        self.assertEqual(r.status_int, 200)
+        self.assertEqual(r.headers['Content-Length'], '0')
+        self.assertEqual(len(r.body), 0)
+
+
 class TestIndexRouting(PecanTestCase):
 
     @property
@@ -180,6 +197,35 @@ class TestLookups(PecanTestCase):
             app = TestApp(Pecan(RootController()))
             r = app.get('/foo/bar', expect_errors=True)
             assert r.status_int == 404
+
+
+class TestCanonicalLookups(PecanTestCase):
+
+    @property
+    def app_(self):
+        class LookupController(object):
+            def __init__(self, someID):
+                self.someID = someID
+
+            @expose()
+            def index(self):
+                return self.someID
+
+        class UserController(object):
+            @expose()
+            def _lookup(self, someID, *remainder):
+                return LookupController(someID), remainder
+
+        class RootController(object):
+            users = UserController()
+
+        return TestApp(Pecan(RootController()))
+
+    def test_canonical_lookup(self):
+        assert self.app_.get('/users', expect_errors=404).status_int == 404
+        assert self.app_.get('/users/', expect_errors=404).status_int == 404
+        assert self.app_.get('/users/100').status_int == 302
+        assert self.app_.get('/users/100/').body == b_('100')
 
 
 class TestControllerArguments(PecanTestCase):

@@ -1,6 +1,9 @@
 from webtest import TestApp
 from six import b as b_
+from six import u as u_
 from six.moves import cStringIO as StringIO
+
+from webob import Response
 
 from pecan import make_app, expose, redirect, abort
 from pecan.hooks import (
@@ -132,6 +135,33 @@ class TestHooks(PecanTestCase):
         assert len(run_hook) == 2
         assert run_hook[0] == 'on_route'
         assert run_hook[1] == 'error'
+
+    def test_on_error_response_hook(self):
+        run_hook = []
+
+        class RootController(object):
+            @expose()
+            def causeerror(self):
+                return [][1]
+
+        class ErrorHook(PecanHook):
+            def on_error(self, state, e):
+                run_hook.append('error')
+
+                r = Response()
+                r.text = u_('on_error')
+
+                return r
+
+        app = TestApp(make_app(RootController(), hooks=[
+            ErrorHook()
+        ]))
+
+        response = app.get('/causeerror')
+
+        assert len(run_hook) == 1
+        assert run_hook[0] == 'error'
+        assert response.text == 'on_error'
 
     def test_prioritized_hooks(self):
         run_hook = []
@@ -1017,21 +1047,6 @@ class TestTransactionHook(PecanTestCase):
 
 class TestRequestViewerHook(PecanTestCase):
 
-    def test_hook_from_config(self):
-        from pecan.configuration import _runtime_conf as conf
-        conf['requestviewer'] = {
-            'blacklist': ['/favicon.ico']
-        }
-
-        class RootController(object):
-            pass
-
-        app = make_app(RootController())
-        while hasattr(app, 'application'):
-            app = app.application
-        del conf.__values__['requestviewer']
-        assert app.hooks
-
     def test_basic_single_default_hook(self):
 
         _stdout = StringIO()
@@ -1043,7 +1058,9 @@ class TestRequestViewerHook(PecanTestCase):
 
         app = TestApp(
             make_app(
-                RootController(), hooks=[RequestViewerHook(writer=_stdout)]
+                RootController(), hooks=lambda: [
+                    RequestViewerHook(writer=_stdout)
+                ]
             )
         )
         response = app.get('/')
@@ -1074,7 +1091,9 @@ class TestRequestViewerHook(PecanTestCase):
 
         app = TestApp(
             make_app(
-                RootController(), hooks=[RequestViewerHook(writer=_stdout)]
+                RootController(), hooks=lambda: [
+                    RequestViewerHook(writer=_stdout)
+                ]
             )
         )
         response = app.get('/404', expect_errors=True)
@@ -1104,7 +1123,7 @@ class TestRequestViewerHook(PecanTestCase):
         app = TestApp(
             make_app(
                 RootController(),
-                hooks=[
+                hooks=lambda: [
                     RequestViewerHook(
                         config={'items': ['path']}, writer=_stdout
                     )
@@ -1139,7 +1158,7 @@ class TestRequestViewerHook(PecanTestCase):
         app = TestApp(
             make_app(
                 RootController(),
-                hooks=[
+                hooks=lambda: [
                     RequestViewerHook(
                         config={'blacklist': ['/']}, writer=_stdout
                     )
@@ -1166,7 +1185,7 @@ class TestRequestViewerHook(PecanTestCase):
         app = TestApp(
             make_app(
                 RootController(),
-                hooks=[
+                hooks=lambda: [
                     RequestViewerHook(
                         config={'items': ['date']}, writer=_stdout
                     )

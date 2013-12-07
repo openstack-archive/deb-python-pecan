@@ -2,18 +2,16 @@ import sys
 
 from setuptools import setup, find_packages
 
-version = '0.3.0'
+version = '0.4.2'
 
 #
 # determine requirements
 #
-requirements = [
-    "WebOb >= 1.2dev",  # py3 compat
-    "simplegeneric >= 0.8",  # py3 compat
-    "Mako >= 0.4.0",
-    "WebTest >= 1.3.1",  # py3 compat
-    "six"
-]
+with open('requirements.txt') as reqs:
+    requirements = [
+        line for line in reqs.read().split('\n')
+        if (line and not line.startswith('-'))
+    ]
 
 try:
     import json  # noqa
@@ -41,11 +39,21 @@ except:
     #
     requirements.append('argparse')
 
+try:
+    from functools import singledispatch  # noqa
+except:
+    #
+    # This was introduced in Python 3.4 - the singledispatch package contains
+    # a backported replacement for 2.6 through 3.3
+    #
+    requirements.append('singledispatch')
+
+
 tests_require = requirements + [
     'virtualenv',
-    'Jinja2',
     'gunicorn',
-    'mock'
+    'mock',
+    'sqlalchemy'
 ]
 if sys.version_info < (2, 7):
     tests_require += ['unittest2']
@@ -57,6 +65,9 @@ if sys.version_info < (3, 0):
 else:
     # Genshi added Python3 support in 0.7
     tests_require += ['Genshi>=0.7']
+
+if sys.version_info < (3, 0) or sys.version_info >= (3, 3):
+    tests_require += ['Jinja2']
 
 #
 # call setup
@@ -90,7 +101,7 @@ setup(
     keywords='web framework wsgi object-dispatch http',
     author='Jonathan LaCour',
     author_email='info@pecanpy.org',
-    url='http://github.com/dreamhost/pecan',
+    url='http://github.com/stackforge/pecan',
     license='BSD',
     packages=find_packages(exclude=['ez_setup', 'examples', 'tests']),
     include_package_data=True,

@@ -46,23 +46,23 @@ object which includes useful information, such as
 the request and response objects, and which controller was selected by
 Pecan's routing.
 
-:func:`on_error` is passed a shared state object **and** the original exception.
-            
+:func:`on_error` is passed a shared state object **and** the original exception. If
+an :func:`on_error` handler returns a Response object, this response will be returned
+to the end user and no furthur :func:`on_error` hooks will be executed.
+
 Attaching Hooks
 ---------------
 
 Hooks can be attached in a project-wide manner by specifying a list of hooks
-in your project's ``app.py`` file.
+in your project's configuration file.
 
 ::
 
-    from application.root import RootController
-    from my_hooks import SimpleHook
-    
-    app = make_app(
-        RootController(),
-        hooks = [SimpleHook()]
-    )
+    app = {
+        'root' : '...'
+        # ...
+        'hooks': lambda: [SimpleHook()]
+    }
 
 Hooks can also be applied selectively to controllers and their sub-controllers
 using the :attr:`__hooks__` attribute on one or more controllers.
@@ -123,20 +123,6 @@ By default, both outputs are enabled.
 
   * :ref:`pecan_hooks`
 
-Enabling RequestViewerHook
-..........................
-
-This hook can be automatically added to the application itself if a certain
-key, ``requestviewer``, exists in the configuration used for the app, e.g.::
-
-    app = {}
-    server = {}
-    requestviewer = {}
-
-It does not need to contain anything (could be an empty dictionary), and this
-is enough to force Pecan to load this hook when the WSGI application is
-created.
-
 Configuring RequestViewerHook
 .............................
 
@@ -177,24 +163,15 @@ response::
     X-Pecan-params	[]
     X-Pecan-hooks	['RequestViewerHook']
 
-The hook can be configured via a dictionary (or Config object from Pecan) when
-adding it to the application or via the ``requestviewer`` key in the actual
-configuration being passed to the application.
-
 The configuration dictionary is flexible (none of the keys are required) and
 can hold two keys: ``items`` and ``blacklist``.
 
-This is how the hook would look if configured directly when using ``make_app``
-(shortened for brevity)::
+This is how the hook would look if configured directly (shortened for brevity)::
 
     ...
-    hooks = [
+    'hooks': lambda: [
         RequestViewerHook({'items':['path']})
     ]
-
-And the same configuration could be set in the config file like::
-
-    requestviewer = {'items:['path']}
 
 Modifying Output Format
 .......................

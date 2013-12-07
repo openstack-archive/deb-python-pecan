@@ -4,10 +4,9 @@ Pecan
 A WSGI object-dispatching web framework, designed to be lean and fast with few
 dependencies.
 
-.. _travis: http://travis-ci.org/dreamhost/pecan
-.. |travis| image:: https://secure.travis-ci.org/dreamhost/pecan.png
-
-|travis|_
+.. image:: https://pypip.in/v/pecan/badge.png
+    :target: https://crate.io/packages/pecan/
+    :alt: Latest PyPI version
 
 Installing
 ----------
@@ -18,7 +17,7 @@ Installing
 
 ...or, for the latest (unstable) tip::
 
-    $ git clone https://github.com/dreamhost/pecan.git -b next
+    $ git clone https://github.com/stackforge/pecan.git
     $ cd pecan && python setup.py install
 
 Running Tests
@@ -44,7 +43,17 @@ Viewing Documentation
     $ cd docs && make man
     $ man docs/build/man/pecan.1
 
+Contributing
+------------
+For information on contributing to Pecan, please read our `Contributing
+Guidelines <https://github.com/stackforge/pecan/blob/master/CONTRIBUTING.rst>`_.
+
+Bugs should be filed on Launchpad, not GitHub:
+
+https://bugs.launchpad.net/pecan
+
 Additional Help/Support
 -----------------------
-Most Pecan interaction is done via the #pecanpy channel on `FreeNode
-<http://freenode.net/>`_ IRC.
+Most Pecan interaction is done via the `pecan-dev Mailing List
+<https://groups.google.com/forum/#!forum/pecan-dev>`_ and the #pecanpy channel
+on `FreeNode <http://freenode.net/>`_ IRC.

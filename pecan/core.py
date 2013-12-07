@@ -13,7 +13,7 @@ import six
 
 from webob import Request, Response, exc, acceptparse
 
-from .compat import urlparse, unquote_plus
+from .compat import urlparse, unquote_plus, izip
 from .templating import RendererFactory
 from .routing import lookup_controller, NonCanonicalPath
 from .util import _cfg, encode_if_needed
@@ -173,11 +173,12 @@ class Pecan(object):
 
     :param root: A string representing a root controller object (e.g.,
                 "myapp.controller.root.RootController")
-    :param default_renderer: The default rendering engine to use. Defaults
-                             to mako.
-    :param template_path: The default relative path to use for templates.
-                          Defaults to 'templates'.
-    :param hooks: A list of Pecan hook objects to use for this application.
+    :param default_renderer: The default template rendering engine to use.
+                             Defaults to mako.
+    :param template_path: A relative file system path (from the project root)
+                          where template files live.  Defaults to 'templates'.
+    :param hooks: A callable which returns a list of
+                  :class:`pecan.hooks.PecanHook`s
     :param custom_renderers: Custom renderer objects, as a dictionary keyed
                              by engine name.
     :param extra_template_vars: Any variables to inject into the template
@@ -195,9 +196,9 @@ class Pecan(object):
     )
 
     def __init__(self, root, default_renderer='mako',
-                 template_path='templates', hooks=[], custom_renderers={},
-                 extra_template_vars={}, force_canonical=True,
-                 guess_content_type_from_ext=True):
+                 template_path='templates', hooks=lambda: [],
+                 custom_renderers={}, extra_template_vars={},
+                 force_canonical=True, guess_content_type_from_ext=True, **kw):
 
         if isinstance(root, six.string_types):
             root = self.__translate_root__(root)
@@ -205,7 +206,11 @@ class Pecan(object):
         self.root = root
         self.renderers = RendererFactory(custom_renderers, extra_template_vars)
         self.default_renderer = default_renderer
+
         # pre-sort these so we don't have to do it per-request
+        if six.callable(hooks):
+            hooks = hooks()
+
         self.hooks = list(sorted(
             hooks,
             key=operator.attrgetter('priority')
@@ -292,16 +297,19 @@ class Pecan(object):
                           ``on_error``, and ``on_route``.
         :param \*args: Arguments to pass to the hooks.
         '''
-
         if hook_type in ['before', 'on_route']:
             hooks = state.hooks
         else:
             hooks = reversed(state.hooks)
 
         for hook in hooks:
-            getattr(hook, hook_type)(*args)
+            result = getattr(hook, hook_type)(*args)
+            # on_error hooks can choose to return a Response, which will
+            # be used instead of the standard error pages.
+            if hook_type == 'on_error' and isinstance(result, Response):
+                return result
 
-    def get_args(self, req, all_params, remainder, argspec, im_self):
+    def get_args(self, pecan_state, all_params, remainder, argspec, im_self):
         '''
         Determines the arguments for a controller based upon parameters
         passed the argument specification for the controller.
@@ -320,9 +328,9 @@ class Pecan(object):
             args.append(im_self)
 
         # grab the routing args from nested REST controllers
-        if 'routing_args' in req.pecan:
-            remainder = req.pecan['routing_args'] + list(remainder)
-            del req.pecan['routing_args']
+        if 'routing_args' in pecan_state:
+            remainder = pecan_state['routing_args'] + list(remainder)
+            del pecan_state['routing_args']
 
         # handle positional arguments
         if valid_args and remainder:
@@ -338,7 +346,7 @@ class Pecan(object):
 
         # get the default positional arguments
         if argspec[3]:
-            defaults = dict(zip(argspec[0][-len(argspec[3]):], argspec[3]))
+            defaults = dict(izip(argspec[0][-len(argspec[3]):], argspec[3]))
         else:
             defaults = dict()
 
@@ -381,23 +389,23 @@ class Pecan(object):
 
         # get a sorted list of hooks, by priority (no controller hooks yet)
         state.hooks = self.hooks
+        pecan_state = req.pecan
 
         # store the routing path for the current application to allow hooks to
         # modify it
-        req.pecan['routing_path'] = req.path_info
+        pecan_state['routing_path'] = path = req.encget('PATH_INFO')
 
         # handle "on_route" hooks
         self.handle_hooks('on_route', state)
 
         # lookup the controller, respecting content-type as requested
         # by the file extension on the URI
-        path = req.pecan['routing_path']
-        req.pecan['extension'] = None
+        pecan_state['extension'] = None
 
         # attempt to guess the content type based on the file extension
         if self.guess_content_type_from_ext \
-                and not req.pecan['content_type'] \
-                and '.' in path.split('/')[-1]:
+                and not pecan_state['content_type'] \
+                and '.' in path:
             new_path, extension = splitext(path)
 
             # preface with a letter to ensure compat for 2.5
@@ -405,8 +413,8 @@ class Pecan(object):
 
             if potential_type is not None:
                 path = new_path
-                req.pecan['extension'] = extension
-                req.pecan['content_type'] = potential_type
+                pecan_state['extension'] = extension
+                pecan_state['content_type'] = potential_type
 
         controller, remainder = self.route(req, self.root, path)
         cfg = _cfg(controller)
@@ -427,14 +435,14 @@ class Pecan(object):
 
         # if unsure ask the controller for the default content type
         content_types = cfg.get('content_types', {})
-        if not req.pecan['content_type']:
+        if not pecan_state['content_type']:
             # attempt to find a best match based on accept headers (if they
             # exist)
-            accept = req.headers.get('Accept', '*/*')
+            accept = getattr(req.accept, 'header_value', '*/*')
             if accept == '*/*' or (
                     accept.startswith('text/html,') and
                     list(content_types.keys()) in self.SIMPLEST_CONTENT_TYPES):
-                req.pecan['content_type'] = cfg.get(
+                pecan_state['content_type'] = cfg.get(
                     'content_type',
                     'text/html'
                 )
@@ -451,23 +459,22 @@ class Pecan(object):
                     logger.error(
                         msg % (
                             controller.__name__,
-                            req.pecan['content_type'],
+                            pecan_state['content_type'],
                             content_types.keys()
                         )
                     )
                     raise exc.HTTPNotAcceptable()
 
-                req.pecan['content_type'] = best_default
+                pecan_state['content_type'] = best_default
         elif cfg.get('content_type') is not None and \
-                req.pecan['content_type'] not in \
-                content_types:
+                pecan_state['content_type'] not in content_types:
 
             msg = "Controller '%s' defined does not support content_type " + \
                   "'%s'. Supported type(s): %s"
             logger.error(
                 msg % (
                     controller.__name__,
-                    req.pecan['content_type'],
+                    pecan_state['content_type'],
                     content_types.keys()
                 )
             )
@@ -480,11 +487,14 @@ class Pecan(object):
         self.handle_hooks('before', state)
 
         # fetch any parameters
-        params = dict(req.params)
+        if req.method == 'GET':
+            params = dict(req.GET)
+        else:
+            params = dict(req.params)
 
         # fetch the arguments for the controller
         args, kwargs = self.get_args(
-            req,
+            pecan_state,
             params,
             remainder,
             cfg['argspec'],
@@ -496,27 +506,25 @@ class Pecan(object):
 
         # a controller can return the response object which means they've taken
         # care of filling it out
-        if result == response:
+        if result is response:
             return
 
         raw_namespace = result
 
         # pull the template out based upon content type and handle overrides
-        template = content_types.get(
-            req.pecan['content_type']
-        )
+        template = content_types.get(pecan_state['content_type'])
 
         # check if for controller override of template
-        template = req.pecan.get('override_template', template)
-        req.pecan['content_type'] = req.pecan.get(
+        template = pecan_state.get('override_template', template)
+        pecan_state['content_type'] = pecan_state.get(
             'override_content_type',
-            req.pecan['content_type']
+            pecan_state['content_type']
         )
 
         # if there is a template, render it
         if template:
             if template == 'json':
-                req.pecan['content_type'] = 'application/json'
+                pecan_state['content_type'] = 'application/json'
             result = self.render(template, result)
 
         # If we are in a test request put the namespace where it can be
@@ -530,12 +538,12 @@ class Pecan(object):
         # set the body content
         if isinstance(result, six.text_type):
             resp.text = result
-        else:
+        elif result:
             resp.body = result
 
         # set the content type
-        if req.pecan['content_type']:
-            resp.content_type = req.pecan['content_type']
+        if pecan_state['content_type']:
+            resp.content_type = pecan_state['content_type']
 
     def __call__(self, environ, start_response):
         '''
@@ -544,8 +552,8 @@ class Pecan(object):
         '''
 
         # create the request and response object
-        state.request = Request(environ)
-        state.response = Response()
+        state.request = req = Request(environ)
+        state.response = resp = Response()
         state.hooks = []
         state.app = self
         state.controller = None
@@ -553,10 +561,10 @@ class Pecan(object):
         # handle the request
         try:
             # add context and environment to the request
-            state.request.context = {}
-            state.request.pecan = dict(content_type=None)
+            req.context = {}
+            req.pecan = dict(content_type=None)
 
-            self.handle_request(state.request, state.response)
+            self.handle_request(req, resp)
         except Exception as e:
             # if this is an HTTP Exception, set it as the response
             if isinstance(e, exc.HTTPException):
@@ -564,11 +572,16 @@ class Pecan(object):
                 environ['pecan.original_exception'] = e
 
             # if this is not an internal redirect, run error hooks
+            on_error_result = None
             if not isinstance(e, ForwardRequestException):
-                self.handle_hooks('on_error', state, e)
+                on_error_result = self.handle_hooks('on_error', state, e)
 
-            if not isinstance(e, exc.HTTPException):
-                raise
+            # if the on_error handler returned a Response, use it.
+            if isinstance(on_error_result, Response):
+                state.response = on_error_result
+            else:
+                if not isinstance(e, exc.HTTPException):
+                    raise
         finally:
             # handle "after" hooks
             self.handle_hooks('after', state)
