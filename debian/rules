@@ -1,7 +1,25 @@
 #!/usr/bin/make -f
 
+PYTHONS:=$(shell pyversions -vr)
+PYTHON3S:=$(shell py3versions -vr)
+
 UPSTREAM_GIT = git://github.com/stackforge/pecan.git
-include /usr/share/openstack-pkg-tools/pkgos.make
+-include /usr/share/openstack-pkg-tools/pkgos.make
 
 %:
 	dh $@ --with python2
+
+override_dh_auto_install:
+	set -e && for pyvers in $(PYTHONS); do \
+		python$$pyvers setup.py install --install-layout=deb \
+			--root $(CURDIR)/debian/python-pecan; \
+	done
+	set -e && for pyvers in $(PYTHON3S); do \
+		python$$pyvers setup.py install --install-layout=deb \
+			--root $(CURDIR)/debian/python3-pecan; \
+	done
+
+override_dh_auto_test:
+	set -e && for pyvers in $(PYTHONS) $(PYTHON3S) ; do \
+		python$$pyvers setup.py test -v ; \
+	done

@@ -2,16 +2,23 @@ Source: python-pecan
 Section: python
 Priority: optional
 Maintainer: PKG OpenStack <openstack-devel@lists.alioth.debian.org>
-Uploaders: Loic Dachary (OuoU) <loic@debian.org>,
-           Julien Danjou <acid@debian.org>,
+Uploaders: Julien Danjou <acid@debian.org>,
            Thomas Goirand <zigo@debian.org>,
-           Ghe Rivero <ghe.rivero@stackops.com>,
            Mehdi Abaakouk <sileht@sileht.net>
-Build-Depends: debhelper (>= 9),
-               openstack-pkg-tools,
-               python-all (>= 2.6.6-3~),
-               python-setuptools
-Standards-Version: 3.9.3
+Build-Depends: debhelper (>= 9), python-all (>= 2.6.6-3~), python-setuptools
+Build-Depends-Indep: python-mako (>= 0.4.0),
+                     python-markupsafe,
+                     python-simplegeneric,
+                     python-webob,
+                     python-webtest,
+                     python3-all (>= 3.2),
+                     python3-mako (>= 0.4.0),
+                     python3-markupsafe,
+                     python3-simplegeneric,
+                     python3-six,
+                     python3-webob,
+                     python3-webtest
+Standards-Version: 3.9.4
 Vcs-Browser: http://anonscm.debian.org/gitweb/?p=openstack/python-pecan.git
 Vcs-Git: git://anonscm.debian.org/openstack/python-pecan.git
 Homepage: http://pypi.python.org/pypi/pecan
@@ -21,7 +28,6 @@ Architecture: all
 Pre-Depends: dpkg (>= 1.15.6~)
 Depends: python (<< 2.8),
          python (>= 2.6.6-7~),
-         python-argparse,
          python-mako (>= 0.4.0),
          python-markupsafe,
          python-simplegeneric,
@@ -29,7 +35,7 @@ Depends: python (<< 2.8),
          python-webob,
          python-webtest,
          ${misc:Depends}
-Description: WSGI object-dispatching web framework
+Description: WSGI object-dispatching web framework - Python 2.x
  The Pecan Python module is a WSGI object-dispatching web framework designed to
  be lean and fast with few dependencies. Pecan comes bundled with a lightweight
  WSGI development server based on Python's wsgiref.simpleserver. Pecan
@@ -40,3 +46,30 @@ Description: WSGI object-dispatching web framework
  WSGI is the "Web Server Gateway Interface". It defines a simple and universal
  interface between web servers and web applications or frameworks for the
  Python programming language.
+ .
+ This package contains the Python 2.x module.
+
+Package: python3-pecan
+Architecture: all
+Pre-Depends: dpkg (>= 1.15.6~)
+Depends: python3 (>= 3.2),
+         python3-mako (>= 0.4.0),
+         python3-markupsafe,
+         python3-simplegeneric,
+         python3-six,
+         python3-webob,
+         python3-webtest,
+         ${misc:Depends}
+Description: WSGI object-dispatching web framework - Python 3.x
+ The Pecan Python module is a WSGI object-dispatching web framework designed to
+ be lean and fast with few dependencies. Pecan comes bundled with a lightweight
+ WSGI development server based on Python's wsgiref.simpleserver. Pecan
+ applications also come with an interactive Python shell which can be used to
+ execute expressions in an environment very similar to the one your application
+ runs in (using the "pecan shell" command).
+ .
+ WSGI is the "Web Server Gateway Interface". It defines a simple and universal
+ interface between web servers and web applications or frameworks for the
+ Python programming language.
+ .
+ This package contains the Python 3.x module.

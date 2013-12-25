@@ -6,6 +6,10 @@ python-pecan (0.4.2-1) UNRELEASED; urgency=medium
   * Ran wrap-and-sort.
   * Updates debian/copyright and debian/rules for the new
     github.com/stackforge/pecan.git URL.
+  * Added python 3.x support.
+  * Removed openstack-pkg-tools as hard dependency.
+  * Now running the unit tests at build time.
+  * Standard-Version is now 3.9.4.
 
  -- Thomas Goirand <zigo@debian.org>  Sat, 07 Dec 2013 17:23:19 +0800
 
