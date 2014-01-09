@@ -1,3 +1,15 @@
+0.4.4
+=====
+* Removed memoization of certain controller attributes, which can lead to
+  a memory leak in dynamic controller lookups.
+
+0.4.3
+=====
+* Fixed several bugs for RestController.
+* Fixed a bug in security handling for generic controllers.
+* Resolved a bug in `_default` handlers used in `RestController`.
+* Persist `pecan.request.context` across internal redirects.
+
 0.4.2
 =====
 * Remove a routing optimization that breaks the WSME pecan plugin.

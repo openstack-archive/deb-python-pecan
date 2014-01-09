@@ -14,6 +14,7 @@ import six
 from webob import Request, Response, exc, acceptparse
 
 from .compat import urlparse, unquote_plus, izip
+from .secure import handle_security
 from .templating import RendererFactory
 from .routing import lookup_controller, NonCanonicalPath
 from .util import _cfg, encode_if_needed
@@ -119,6 +120,7 @@ def redirect(location=None, internal=False, code=None, headers={},
     if internal:
         if code is not None:
             raise ValueError('Cannot specify a code for internal redirects')
+        request.environ['pecan.recursive.context'] = request.context
         raise ForwardRequestException(location)
     if code is None:
         code = 302
@@ -428,6 +430,7 @@ class Pecan(object):
             im_self = six.get_method_self(controller)
             handlers = cfg['generic_handlers']
             controller = handlers.get(req.method, handlers['DEFAULT'])
+            handle_security(controller, im_self)
             cfg = _cfg(controller)
 
         # add the controller to the state so that hooks can use it
@@ -561,7 +564,7 @@ class Pecan(object):
         # handle the request
         try:
             # add context and environment to the request
-            req.context = {}
+            req.context = environ.get('pecan.recursive.context', {})
             req.pecan = dict(content_type=None)
 
             self.handle_request(req, resp)
