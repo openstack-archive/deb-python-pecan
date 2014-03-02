@@ -6,7 +6,9 @@ Uploaders: Julien Danjou <acid@debian.org>,
            Thomas Goirand <zigo@debian.org>,
            Mehdi Abaakouk <sileht@sileht.net>
 Build-Depends: debhelper (>= 9), python-all (>= 2.6.6-3~), python-setuptools
-Build-Depends-Indep: python-logutils,
+Build-Depends-Indep: gunicorn,
+                     python-kajiki,
+                     python-logutils,
                      python-mako (>= 0.4.0),
                      python-markupsafe,
                      python-simplegeneric,
@@ -14,6 +16,7 @@ Build-Depends-Indep: python-logutils,
                      python-webob,
                      python-webtest,
                      python3-all (>= 3.2),
+                     python3-kajiki,
                      python3-logutils,
                      python3-mako (>= 0.4.0),
                      python3-markupsafe,
@@ -40,8 +43,8 @@ Depends: python (<< 2.8),
          python-six,
          python-webob,
          python-webtest,
-         ${python:Depends},
-         ${misc:Depends}
+         ${misc:Depends},
+         ${python:Depends}
 Description: WSGI object-dispatching web framework - Python 2.x
  The Pecan Python module is a WSGI object-dispatching web framework designed to
  be lean and fast with few dependencies. Pecan comes bundled with a lightweight
