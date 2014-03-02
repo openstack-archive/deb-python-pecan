@@ -1,15 +1,13 @@
-python-pecan (0.4.4-1) UNRELEASED; urgency=medium
+python-pecan (0.4.5-1) unstable; urgency=medium
 
-  * Removes ${python:Depends} and writes dependencies by hand, as under wheezy,
-    python-logutils is added automatically despite the fact it isn't needed,
-    and I wish to build a backport.
+  * New upstream release.
   * Ran wrap-and-sort.
   * Updates debian/copyright and debian/rules for the new
     github.com/stackforge/pecan.git URL.
   * Added python 3.x support.
   * Removed openstack-pkg-tools as hard dependency.
   * Now running the unit tests at build time.
-  * Standard-Version is now 3.9.4.
+  * Standard-Version is now 3.9.5.
   * Added a bunch of new (build-)dependencies.
 
  -- Thomas Goirand <zigo@debian.org>  Sat, 07 Dec 2013 17:23:19 +0800

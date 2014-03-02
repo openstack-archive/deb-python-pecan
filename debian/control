@@ -22,7 +22,7 @@ Build-Depends-Indep: python-logutils,
                      python3-six,
                      python3-webob,
                      python3-webtest
-Standards-Version: 3.9.4
+Standards-Version: 3.9.5
 Vcs-Browser: http://anonscm.debian.org/gitweb/?p=openstack/python-pecan.git
 Vcs-Git: git://anonscm.debian.org/openstack/python-pecan.git
 Homepage: http://pypi.python.org/pypi/pecan
@@ -40,6 +40,7 @@ Depends: python (<< 2.8),
          python-six,
          python-webob,
          python-webtest,
+         ${python:Depends},
          ${misc:Depends}
 Description: WSGI object-dispatching web framework - Python 2.x
  The Pecan Python module is a WSGI object-dispatching web framework designed to
