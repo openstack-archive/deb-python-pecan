@@ -9,27 +9,26 @@ not explicit instruction; deployment is usually heavily dependent upon
 the needs and goals of individual applications, so your mileage will
 probably vary.
 
-.. ::
+.. note::
 
     While Pecan comes packaged with a simple server *for development use*
-    (``pecan serve``), using a *production-ready* server similar to the ones
+    (:command:`pecan serve`), using a *production-ready* server similar to the ones
     described in this document is **very highly encouraged**.
 
 Installing Pecan
 ----------------
 
-A few popular options are avaliable for installing Pecan in production
+A few popular options are available for installing Pecan in production
 environments:
 
-*  Using `setuptools/distribute
-   <http://packages.python.org/distribute/setuptools.html>`_.  Manage
+*  Using `setuptools <https://pypi.python.org/pypi/setuptools>`_.  Manage
    Pecan as a dependency in your project's ``setup.py`` file so that it's
    installed alongside your project (e.g., ``python
    /path/to/project/setup.py install``).  The default Pecan project
    described in :ref:`quick_start` facilitates this by including Pecan as
    a dependency for your project.
 
-*  Using `pip <http://www.pip-installer.org/en/latest/requirements.html>`_.
+*  Using `pip <http://www.pip-installer.org/>`_.
    Use ``pip freeze`` and ``pip install`` to create and install from
    a ``requirements.txt`` file for your project.
 
@@ -73,7 +72,7 @@ examples are:
 * `CherryPy <http://cherrypy.org/>`__
 
 Generally speaking, the WSGI entry point to any Pecan application can be
-generated using ``pecan.deploy``::
+generated using :func:`~pecan.deploy.deploy`::
 
     from pecan.deploy import deploy
     application = deploy('/path/to/some/app/config.py')
@@ -249,7 +248,7 @@ application should be served. This is how the script (named ``run.py``) looks::
         }
         return cherrypy.tree.mount(Root(), '/', config=configuration)
 
-    # Assuming your app has media on diferent paths, like 'css', and 'images'
+    # Assuming your app has media on different paths, like 'css', and 'images'
     application = wsgiserver.WSGIPathInfoDispatcher({
         '/': simpleapp_wsgi_app,
         '/css': make_static_config('css'),

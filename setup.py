@@ -2,7 +2,7 @@ import sys
 
 from setuptools import setup, find_packages
 
-version = '0.4.4'
+version = '0.4.5'
 
 #
 # determine requirements
@@ -44,7 +44,7 @@ try:
 except:
     #
     # This was introduced in Python 3.4 - the singledispatch package contains
-    # a backported replacement for 2.6 through 3.3
+    # a backported replacement for 2.6 through 3.4
     #
     requirements.append('singledispatch')
 
@@ -95,6 +95,7 @@ setup(
         'Programming Language :: Python :: 3',
         'Programming Language :: Python :: 3.2',
         'Programming Language :: Python :: 3.3',
+        'Programming Language :: Python :: 3.4',
         'Topic :: Internet :: WWW/HTTP :: WSGI',
         'Topic :: Software Development :: Libraries :: Application Frameworks'
     ],

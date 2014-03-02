@@ -40,15 +40,13 @@ class HookControllerMeta(type):
         walk_controller(cls, cls, dict_.get('__hooks__', []))
 
 
-'''
-A base class for controllers that would like to specify hooks on
-their controller methods. Simply create a list of hook objects
-called ``__hooks__`` as a member of the controller's namespace.
-'''
 HookController = HookControllerMeta(
     'HookController',
     (object,),
-    {}
+    {'__doc__': ("A base class for controllers that would like to specify "
+                 "hooks on their controller methods. Simply create a list "
+                 "of hook objects called ``__hooks__`` as a class attribute "
+                 "of your controller.")}
 )
 
 
@@ -242,14 +240,14 @@ class RequestViewerHook(PecanHook):
     **blacklist**
 
     This key holds items that will be blacklisted based on ``url``. If
-    there is a need to ommit urls that start with `/javascript`, then this
+    there is a need to omit urls that start with `/javascript`, then this
     key would look like::
 
         'blacklist': ['/javascript']
 
     As many blacklisting items as needed can be contained in the list. The hook
     will verify that the url is not starting with items in this list to display
-    results, otherwise it will get ommited.
+    results, otherwise it will get omitted.
 
     .. note::
         This key should always use a ``list`` of items to use.

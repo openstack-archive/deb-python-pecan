@@ -180,7 +180,7 @@ class Pecan(object):
     :param template_path: A relative file system path (from the project root)
                           where template files live.  Defaults to 'templates'.
     :param hooks: A callable which returns a list of
-                  :class:`pecan.hooks.PecanHook`s
+                  :class:`pecan.hooks.PecanHook`
     :param custom_renderers: Custom renderer objects, as a dictionary keyed
                              by engine name.
     :param extra_template_vars: Any variables to inject into the template
@@ -598,3 +598,4 @@ class Pecan(object):
             del state.request
             del state.response
             del state.controller
+            del state.app

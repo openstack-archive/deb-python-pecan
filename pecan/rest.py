@@ -1,6 +1,7 @@
 from inspect import getargspec, ismethod
 
 from webob import exc
+import six
 
 from .core import abort, request
 from .decorators import expose
@@ -88,6 +89,9 @@ class RestController(object):
         return result
 
     def _handle_lookup(self, args):
+        # filter empty strings from the arg list
+        args = list(six.moves.filter(bool, args))
+
         # check for lookup controllers
         lookup = getattr(self, '_lookup', None)
         if args and iscontroller(lookup):
