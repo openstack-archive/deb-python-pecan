@@ -1,1 +1,2 @@
 removes-download-of-virtualenv.patch
+avoid-network-downloads.patch
