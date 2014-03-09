@@ -6,6 +6,9 @@ PYTHON3S:=$(shell py3versions -vr)
 UPSTREAM_GIT = git://github.com/stackforge/pecan.git
 -include /usr/share/openstack-pkg-tools/pkgos.make
 
+export http_proxy=127.0.0.1:9
+export https_proxy=127.0.0.1:9
+
 %:
 	dh $@ --with python2,python3
 
