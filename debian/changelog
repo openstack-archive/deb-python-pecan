@@ -9,6 +9,7 @@ python-pecan (0.4.5-1) unstable; urgency=medium
   * Now running the unit tests at build time.
   * Standard-Version is now 3.9.5.
   * Added a bunch of new (build-)dependencies.
+  * Patches setup.py to not download the virtualenv tarball.
 
  -- Thomas Goirand <zigo@debian.org>  Sat, 07 Dec 2013 17:23:19 +0800
 
