@@ -31,8 +31,8 @@ override_dh_auto_install:
 		$(CURDIR)/debian/python3-pecan/usr/bin/gunicorn_pecan-python3
 	mv $(CURDIR)/debian/python3-pecan/usr/bin/pecan \
 		$(CURDIR)/debian/python3-pecan/usr/bin/pecan-python3
-	sed -i 1 '#python3.4#python3#' $(CURDIR)/debian/python3-pecan/usr/bin/gunicorn_pecan-python3
-	sed -i 1 '#python3.4#python3#' $(CURDIR)/debian/python3-pecan/usr/bin/pecan-python3
+	sed -i 1' s#python3.4#python3#' $(CURDIR)/debian/python3-pecan/usr/bin/gunicorn_pecan-python3
+	sed -i 1' s#python3.4#python3#' $(CURDIR)/debian/python3-pecan/usr/bin/pecan-python3
 
 override_dh_auto_test:
 	set -e && for pyvers in $(PYTHONS) ; do \
