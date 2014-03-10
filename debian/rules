@@ -22,6 +22,16 @@ override_dh_auto_install:
 			--root $(CURDIR)/debian/python3-pecan; \
 	done
 
+	mv $(CURDIR)/debian/python-pecan/usr/bin/gunicorn_pecan \
+		$(CURDIR)/debian/python-pecan/usr/bin/gunicorn_pecan-python2
+	mv $(CURDIR)/debian/python-pecan/usr/bin/pecan \
+		$(CURDIR)/debian/python-pecan/usr/bin/pecan-python2
+
+	mv $(CURDIR)/debian/python3-pecan/usr/bin/gunicorn_pecan \
+		$(CURDIR)/debian/python3-pecan/usr/bin/gunicorn_pecan-python3
+	mv $(CURDIR)/debian/python3-pecan/usr/bin/pecan \
+		$(CURDIR)/debian/python3-pecan/usr/bin/pecan-python3
+
 override_dh_auto_test:
 	set -e && for pyvers in $(PYTHONS) $(PYTHON3S) ; do \
 		python$$pyvers setup.py test -v ; \

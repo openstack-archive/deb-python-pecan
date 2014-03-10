@@ -1,0 +1,16 @@
+#!/bin/sh
+
+set -e
+
+if [ "${1}" = "upgrade" ] ; then
+	if [ ! -h /usr/bin/gunicorn_pecan ] && [ -e /usr/bin/gunicorn_pecan ] ; then
+		rm /usr/bin/gunicorn_pecan
+	fi
+	if [ ! -h /usr/bin/pecan ] && [ -e /usr/bin/pecan ] ; then
+		rm /usr/bin/pecan
+	fi
+fi
+
+#DEBHELPER#
+
+exit 0

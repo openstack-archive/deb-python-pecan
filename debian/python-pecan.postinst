@@ -1,0 +1,12 @@
+#!/bin/sh
+
+set -e
+
+if [ "$1" = "configure" ] ; then
+	update-alternatives --install /usr/bin/gunicorn_pecan gunicorn_pecan /usr/bin/gunicorn_pecan-python2 300
+	update-alternatives --install /usr/bin/pecan pecan /usr/bin/pecan-python2 300
+fi
+
+#DEBHELPER#
+
+exit 0
