@@ -10,7 +10,7 @@ export http_proxy=127.0.0.1:9
 export https_proxy=127.0.0.1:9
 
 %:
-	dh $@ --with python2,python3
+	dh $@ --with python2,python3,sphinxdoc
 
 override_dh_auto_install:
 	set -e && for pyvers in $(PYTHONS); do \
@@ -41,3 +41,9 @@ override_dh_auto_test:
 	set -e && for pyvers in $(PYTHON3S) ; do \
 		python$$pyvers setup.py test -v || true ; \
 	done
+
+override_dh_sphinxdoc:
+ifeq (,$(findstring nodocs, $(DEB_BUILD_OPTIONS)))
+	PYTHONPATH=$(CURDIR) sphinx-build docs/source $(CURDIR)/debian/python-pecan-doc/usr/share/doc/python-pecan-doc/html
+	dh_sphinxdoc
+endif

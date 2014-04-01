@@ -20,6 +20,7 @@ Build-Depends-Indep: gunicorn,
                      python-mock,
                      python-simplegeneric,
                      python-singledispatch,
+                     python-sphinx,
                      python-sqlalchemy,
                      python-unittest2,
                      python-webob,
@@ -95,3 +96,22 @@ Description: WSGI object-dispatching web framework - Python 3.x
  Python programming language.
  .
  This package contains the Python 3.x module.
+
+Package: python-pecan-doc
+Section: doc
+Architecture: all
+Pre-Depends: dpkg (>= 1.15.6~)
+Depends: ${misc:Depends}, ${sphinxdoc:Depends}
+Description: WSGI object-dispatching web framework
+ The Pecan Python module is a WSGI object-dispatching web framework designed to
+ be lean and fast with few dependencies. Pecan comes bundled with a lightweight
+ WSGI development server based on Python's wsgiref.simpleserver. Pecan
+ applications also come with an interactive Python shell which can be used to
+ execute expressions in an environment very similar to the one your application
+ runs in (using the "pecan shell" command).
+ .
+ WSGI is the "Web Server Gateway Interface". It defines a simple and universal
+ interface between web servers and web applications or frameworks for the
+ Python programming language.
+ .
+ This package contains the pecan documentation.

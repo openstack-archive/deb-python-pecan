@@ -1,0 +1,9 @@
+Document: python-pecan-doc
+Title: Pecan Documentation
+Author: Pecan
+Abstract: Sphinx documentation for Pecan
+Section: Programming/Python
+
+Format: HTML
+Index: /usr/share/doc/python-pecan-doc/html/index.html
+Files: /usr/share/doc/python-pecan-doc/html/*
