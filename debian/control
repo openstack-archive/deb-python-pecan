@@ -34,6 +34,7 @@ Build-Depends-Indep: gunicorn,
                      python3-simplegeneric,
                      python3-singledispatch,
                      python3-six,
+                     python3-sqlalchemy,
                      python3-webob,
                      python3-webtest
 Standards-Version: 3.9.5
