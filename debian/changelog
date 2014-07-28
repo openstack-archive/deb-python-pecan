@@ -1,6 +1,6 @@
 python-pecan (0.6.1-2) unstable; urgency=medium
 
-  * Added missing build-depends: python3-sqlalchemy.
+  * Added missing build-depends: python3-sqlalchemy and python3-mock.
 
  -- Thomas Goirand <zigo@debian.org>  Mon, 28 Jul 2014 22:42:25 +0800
 
