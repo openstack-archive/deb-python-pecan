@@ -1,1 +1,2 @@
 avoid-pypi-downloads-during-build.patch
+no-intersphinx.patch
