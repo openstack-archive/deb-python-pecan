@@ -3,15 +3,17 @@ Description: Avoid pypi downloads during build
  unit tests are downloading from pypi.
 Author: Thomas Goirand <zigo@debian.org>
 Forwarded: no
-Last-Update: 2014-03-10
+Last-Update: 2014-07-28
 
---- python-pecan-0.4.5.orig/setup.py
-+++ python-pecan-0.4.5/setup.py
-@@ -43,22 +43,22 @@
+--- a/setup.py
++++ b/setup.py
+@@ -42,23 +42,23 @@
+ 
  
  tests_require = requirements + [
-     'virtualenv',
+-    'virtualenv',
 -    'gunicorn',
++#    'virtualenv',
 +#    'gunicorn',
      'mock',
      'sqlalchemy'
