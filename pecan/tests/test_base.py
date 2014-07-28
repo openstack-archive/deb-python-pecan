@@ -7,14 +7,16 @@ if sys.version_info < (2, 7):
 else:
     import unittest  # pragma: nocover
 
+import webob
+from webob.exc import HTTPNotFound
 from webtest import TestApp
 import six
 from six import b as b_
 from six.moves import cStringIO as StringIO
 
 from pecan import (
-    Pecan, expose, request, response, redirect, abort, make_app,
-    override_template, render
+    Pecan, Request, Response, expose, request, response, redirect,
+    abort, make_app, override_template, render
 )
 from pecan.templating import (
     _builtin_renderers as builtin_renderers, error_formatters
@@ -42,13 +44,97 @@ class TestEmptyContent(PecanTestCase):
             def index(self):
                 pass
 
+            @expose()
+            def explicit_body(self):
+                response.body = b_('Hello, World!')
+
+            @expose()
+            def empty_body(self):
+                response.body = b_('')
+
+            @expose()
+            def explicit_text(self):
+                response.text = six.text_type('Hello, World!')
+
+            @expose()
+            def empty_text(self):
+                response.text = six.text_type('')
+
+            @expose()
+            def explicit_json(self):
+                response.json = {'foo': 'bar'}
+
+            @expose()
+            def explicit_json_body(self):
+                response.json_body = {'foo': 'bar'}
+
         return TestApp(Pecan(RootController()))
 
     def test_empty_index(self):
         r = self.app_.get('/')
-        self.assertEqual(r.status_int, 200)
+        self.assertEqual(r.status_int, 204)
+        self.assertNotIn('Content-Type', r.headers)
         self.assertEqual(r.headers['Content-Length'], '0')
         self.assertEqual(len(r.body), 0)
+
+    def test_explicit_body(self):
+        r = self.app_.get('/explicit_body/')
+        self.assertEqual(r.status_int, 200)
+        self.assertEqual(r.body, b_('Hello, World!'))
+
+    def test_empty_body(self):
+        r = self.app_.get('/empty_body/')
+        self.assertEqual(r.status_int, 204)
+        self.assertEqual(r.body, b_(''))
+
+    def test_explicit_text(self):
+        r = self.app_.get('/explicit_text/')
+        self.assertEqual(r.status_int, 200)
+        self.assertEqual(r.body, b_('Hello, World!'))
+
+    def test_empty_text(self):
+        r = self.app_.get('/empty_text/')
+        self.assertEqual(r.status_int, 204)
+        self.assertEqual(r.body, b_(''))
+
+    def test_explicit_json(self):
+        r = self.app_.get('/explicit_json/')
+        self.assertEqual(r.status_int, 200)
+        json_resp = json.loads(r.body.decode())
+        assert json_resp == {'foo': 'bar'}
+
+    def test_explicit_json_body(self):
+        r = self.app_.get('/explicit_json_body/')
+        self.assertEqual(r.status_int, 200)
+        json_resp = json.loads(r.body.decode())
+        assert json_resp == {'foo': 'bar'}
+
+
+class TestAppIterFile(PecanTestCase):
+    @property
+    def app_(self):
+        class RootController(object):
+            @expose()
+            def index(self):
+                body = six.BytesIO(b_('Hello, World!'))
+                response.body_file = body
+
+            @expose()
+            def empty(self):
+                body = six.BytesIO(b_(''))
+                response.body_file = body
+
+        return TestApp(Pecan(RootController()))
+
+    def test_body_generator(self):
+        r = self.app_.get('/')
+        self.assertEqual(r.status_int, 200)
+        assert r.body == b_('Hello, World!')
+
+    def test_empty_body_generator(self):
+        r = self.app_.get('/empty')
+        self.assertEqual(r.status_int, 204)
+        assert len(r.body) == 0
 
 
 class TestIndexRouting(PecanTestCase):
@@ -283,7 +369,7 @@ class TestControllerArguments(PecanTestCase):
                 )
 
             @expose()
-            def _route(self, args):
+            def _route(self, args, request):
                 if hasattr(self, args[0]):
                     return getattr(self, args[0]), args[1:]
                 else:
@@ -758,6 +844,42 @@ class TestControllerArguments(PecanTestCase):
         assert r.body == b_('eater: 10, dummy, day=12, month=1')
 
 
+class TestDefaultErrorRendering(PecanTestCase):
+
+    def test_plain_error(self):
+        class RootController(object):
+            pass
+
+        app = TestApp(Pecan(RootController()))
+        r = app.get('/', status=404)
+        assert r.status_int == 404
+        assert r.content_type == 'text/plain'
+        assert r.body == b_(HTTPNotFound().plain_body({}))
+
+    def test_html_error(self):
+        class RootController(object):
+            pass
+
+        app = TestApp(Pecan(RootController()))
+        r = app.get('/', headers={'Accept': 'text/html'}, status=404)
+        assert r.status_int == 404
+        assert r.content_type == 'text/html'
+        assert r.body == b_(HTTPNotFound().html_body({}))
+
+    def test_json_error(self):
+        class RootController(object):
+            pass
+
+        app = TestApp(Pecan(RootController()))
+        r = app.get('/', headers={'Accept': 'application/json'}, status=404)
+        assert r.status_int == 404
+        json_resp = json.loads(r.body.decode())
+        assert json_resp['code'] == 404
+        assert json_resp['description'] is None
+        assert json_resp['title'] == 'Not Found'
+        assert r.content_type == 'application/json'
+
+
 class TestAbort(PecanTestCase):
 
     def test_abort(self):
@@ -867,9 +989,9 @@ class TestRedirect(PecanTestCase):
         res = app.get(
             '/child', extra_environ=dict(HTTP_X_FORWARDED_PROTO='https')
         )
-        ##non-canonical url will redirect, so we won't get a 301
+        # non-canonical url will redirect, so we won't get a 301
         assert res.status_int == 302
-        ##should add trailing / and changes location to https
+        # should add trailing / and changes location to https
         assert res.location == 'https://localhost/child/'
         assert res.request.environ['HTTP_X_FORWARDED_PROTO'] == 'https'
 
@@ -934,6 +1056,57 @@ class TestStreamedResponse(PecanTestCase):
         r = app.get('/test/plain')
         assert r.content_type == 'text/plain'
         assert r.body == b_('plain text')
+
+
+class TestManualResponse(PecanTestCase):
+
+    def test_manual_response(self):
+
+        class RootController(object):
+            @expose()
+            def index(self):
+                resp = webob.Response(response.environ)
+                resp.body = b_('Hello, World!')
+                return resp
+
+        app = TestApp(Pecan(RootController()))
+        r = app.get('/')
+        assert r.body == b_('Hello, World!')
+
+
+class TestCustomResponseandRequest(PecanTestCase):
+
+    def test_custom_objects(self):
+
+        class CustomRequest(Request):
+
+            @property
+            def headers(self):
+                headers = super(CustomRequest, self).headers
+                headers['X-Custom-Request'] = 'ABC'
+                return headers
+
+        class CustomResponse(Response):
+
+            @property
+            def headers(self):
+                headers = super(CustomResponse, self).headers
+                headers['X-Custom-Response'] = 'XYZ'
+                return headers
+
+        class RootController(object):
+            @expose()
+            def index(self):
+                return request.headers.get('X-Custom-Request')
+
+        app = TestApp(Pecan(
+            RootController(),
+            request_cls=CustomRequest,
+            response_cls=CustomResponse
+        ))
+        r = app.get('/')
+        assert r.body == b_('ABC')
+        assert r.headers.get('X-Custom-Response') == 'XYZ'
 
 
 class TestThreadLocalState(PecanTestCase):
@@ -1005,7 +1178,7 @@ class TestFileTypeExtensions(PecanTestCase):
 
     def test_hidden_file(self):
         r = self.app_.get('/.vimrc')
-        assert r.status_int == 200
+        assert r.status_int == 204
         assert r.body == b_('')
 
     def test_multi_dot_extension(self):
@@ -1501,3 +1674,40 @@ class TestEngines(PecanTestCase):
         r = app.get('/')
         assert r.status_int == 200
         assert b_("<h1>Hello, Jonathan!</h1>") in r.body
+
+    def test_default_json_renderer(self):
+
+        class RootController(object):
+            @expose()
+            def index(self, name='Bill'):
+                return dict(name=name)
+
+        app = TestApp(Pecan(RootController(), default_renderer='json'))
+        r = app.get('/')
+        assert r.status_int == 200
+        result = dict(json.loads(r.body.decode()))
+        assert result == {'name': 'Bill'}
+
+
+class TestDeprecatedRouteMethod(PecanTestCase):
+
+    @property
+    def app_(self):
+        class RootController(object):
+
+            @expose()
+            def index(self, *args):
+                return ', '.join(args)
+
+            @expose()
+            def _route(self, args):
+                return self.index, args
+
+        return TestApp(Pecan(RootController()))
+
+    def test_required_argument(self):
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            r = self.app_.get('/foo/bar/')
+            assert r.status_int == 200
+            assert b_('foo, bar') in r.body

@@ -1,9 +1,10 @@
 from inspect import getargspec, ismethod
+import warnings
 
 from webob import exc
 import six
 
-from .core import abort, request
+from .core import abort
 from .decorators import expose
 from .routing import lookup_controller, handle_lookup_traversal
 from .util import iscontroller
@@ -26,31 +27,41 @@ class RestController(object):
     '''
     _custom_actions = {}
 
+    def _get_args_for_controller(self, controller):
+        """
+        Retrieve the arguments we actually care about.  For Pecan applications
+        that utilize thread locals, we should truncate the first argument,
+        `self`.  For applications that explicitly pass request/response
+        references as the first controller arguments, we should truncate the
+        first three arguments, `self, req, resp`.
+        """
+        argspec = getargspec(controller)
+        from pecan import request
+        try:
+            request.path
+        except AttributeError:
+            return argspec.args[3:]
+        return argspec.args[1:]
+
     @expose()
-    def _route(self, args):
+    def _route(self, args, request=None):
         '''
         Routes a request to the appropriate controller and returns its result.
 
         Performs a bit of validation - refuses to route delete and put actions
         via a GET request).
         '''
+        if request is None:
+            from pecan import request
         # convention uses "_method" to handle browser-unsupported methods
-        if request.environ.get('pecan.validation_redirected', False) is True:
-            #
-            # If the request has been internally redirected due to a validation
-            # exception, we want the request method to be enforced as GET, not
-            # the `_method` param which may have been passed for REST support.
-            #
-            method = request.method.lower()
-        else:
-            method = request.params.get('_method', request.method).lower()
+        method = request.params.get('_method', request.method).lower()
 
         # make sure DELETE/PUT requests don't use GET
         if request.method == 'GET' and method in ('delete', 'put'):
             abort(405)
 
         # check for nested controllers
-        result = self._find_sub_controllers(args)
+        result = self._find_sub_controllers(args, request)
         if result:
             return result
 
@@ -62,17 +73,20 @@ class RestController(object):
         )
 
         try:
-            result = handler(method, args)
+            if len(getargspec(handler).args) == 3:
+                result = handler(method, args)
+            else:
+                result = handler(method, args, request)
 
             #
             # If the signature of the handler does not match the number
             # of remaining positional arguments, attempt to handle
             # a _lookup method (if it exists)
             #
-            argspec = getargspec(result[0])
-            num_args = len(argspec[0][1:])
+            argspec = self._get_args_for_controller(result[0])
+            num_args = len(argspec)
             if num_args < len(args):
-                _lookup_result = self._handle_lookup(args)
+                _lookup_result = self._handle_lookup(args, request)
                 if _lookup_result:
                     return _lookup_result
         except exc.HTTPNotFound:
@@ -80,7 +94,7 @@ class RestController(object):
             # If the matching handler results in a 404, attempt to handle
             # a _lookup method (if it exists)
             #
-            _lookup_result = self._handle_lookup(args)
+            _lookup_result = self._handle_lookup(args, request)
             if _lookup_result:
                 return _lookup_result
             raise
@@ -88,7 +102,10 @@ class RestController(object):
         # return the result
         return result
 
-    def _handle_lookup(self, args):
+    def _handle_lookup(self, args, request=None):
+        if request is None:
+            self._raise_method_deprecation_warning(self.handle_lookup)
+
         # filter empty strings from the arg list
         args = list(six.moves.filter(bool, args))
 
@@ -97,7 +114,8 @@ class RestController(object):
         if args and iscontroller(lookup):
             result = handle_lookup_traversal(lookup, args)
             if result:
-                return lookup_controller(*result)
+                obj, remainder = result
+                return lookup_controller(obj, remainder, request)
 
     def _find_controller(self, *args):
         '''
@@ -109,7 +127,7 @@ class RestController(object):
                 return obj
         return None
 
-    def _find_sub_controllers(self, remainder):
+    def _find_sub_controllers(self, remainder, request):
         '''
         Identifies the correct controller to route to by analyzing the
         request URI.
@@ -124,34 +142,39 @@ class RestController(object):
             return
 
         # get the args to figure out how much to chop off
-        args = getargspec(getattr(self, method))
-        fixed_args = len(args[0][1:]) - len(
+        args = self._get_args_for_controller(getattr(self, method))
+        fixed_args = len(args) - len(
             request.pecan.get('routing_args', [])
         )
-        var_args = args[1]
+        var_args = getargspec(getattr(self, method)).varargs
 
         # attempt to locate a sub-controller
         if var_args:
             for i, item in enumerate(remainder):
                 controller = getattr(self, item, None)
                 if controller and not ismethod(controller):
-                    self._set_routing_args(remainder[:i])
-                    return lookup_controller(controller, remainder[i + 1:])
+                    self._set_routing_args(request, remainder[:i])
+                    return lookup_controller(controller, remainder[i + 1:],
+                                             request)
         elif fixed_args < len(remainder) and hasattr(
             self, remainder[fixed_args]
         ):
             controller = getattr(self, remainder[fixed_args])
             if not ismethod(controller):
-                self._set_routing_args(remainder[:fixed_args])
+                self._set_routing_args(request, remainder[:fixed_args])
                 return lookup_controller(
                     controller,
-                    remainder[fixed_args + 1:]
+                    remainder[fixed_args + 1:],
+                    request
                 )
 
-    def _handle_unknown_method(self, method, remainder):
+    def _handle_unknown_method(self, method, remainder, request=None):
         '''
         Routes undefined actions (like RESET) to the appropriate controller.
         '''
+        if request is None:
+            self._raise_method_deprecation_warning(self._handle_unknown_method)
+
         # try finding a post_{custom} or {custom} method first
         controller = self._find_controller('post_%s' % method, method)
         if controller:
@@ -164,18 +187,28 @@ class RestController(object):
                 abort(405)
             sub_controller = getattr(self, remainder[0], None)
             if sub_controller:
-                return lookup_controller(sub_controller, remainder[1:])
+                return lookup_controller(sub_controller, remainder[1:],
+                                         request)
 
         abort(404)
 
-    def _handle_get(self, method, remainder):
+    def _handle_get(self, method, remainder, request=None):
         '''
         Routes ``GET`` actions to the appropriate controller.
         '''
+        if request is None:
+            self._raise_method_deprecation_warning(self._handle_get)
+
         # route to a get_all or get if no additional parts are available
         if not remainder or remainder == ['']:
             controller = self._find_controller('get_all', 'get')
             if controller:
+                argspec = self._get_args_for_controller(controller)
+                fixed_args = len(argspec) - len(
+                    request.pecan.get('routing_args', [])
+                )
+                if len(remainder) < fixed_args:
+                    abort(404)
                 return controller, []
             abort(404)
 
@@ -188,13 +221,13 @@ class RestController(object):
             if controller:
                 return controller, remainder[:-1]
 
-        match = self._handle_custom_action(method, remainder)
+        match = self._handle_custom_action(method, remainder, request)
         if match:
             return match
 
         controller = getattr(self, remainder[0], None)
         if controller and not ismethod(controller):
-            return lookup_controller(controller, remainder[1:])
+            return lookup_controller(controller, remainder[1:], request)
 
         # finally, check for the regular get_one/get requests
         controller = self._find_controller('get_one', 'get')
@@ -203,18 +236,21 @@ class RestController(object):
 
         abort(404)
 
-    def _handle_delete(self, method, remainder):
+    def _handle_delete(self, method, remainder, request=None):
         '''
         Routes ``DELETE`` actions to the appropriate controller.
         '''
+        if request is None:
+            self._raise_method_deprecation_warning(self._handle_delete)
+
         if remainder:
-            match = self._handle_custom_action(method, remainder)
+            match = self._handle_custom_action(method, remainder, request)
             if match:
                 return match
 
             controller = getattr(self, remainder[0], None)
             if controller and not ismethod(controller):
-                return lookup_controller(controller, remainder[1:])
+                return lookup_controller(controller, remainder[1:], request)
 
         # check for post_delete/delete requests first
         controller = self._find_controller('post_delete', 'delete')
@@ -228,23 +264,27 @@ class RestController(object):
                 abort(405)
             sub_controller = getattr(self, remainder[0], None)
             if sub_controller:
-                return lookup_controller(sub_controller, remainder[1:])
+                return lookup_controller(sub_controller, remainder[1:],
+                                         request)
 
         abort(404)
 
-    def _handle_post(self, method, remainder):
+    def _handle_post(self, method, remainder, request=None):
         '''
         Routes ``POST`` requests.
         '''
+        if request is None:
+            self._raise_method_deprecation_warning(self._handle_post)
+
         # check for custom POST/PUT requests
         if remainder:
-            match = self._handle_custom_action(method, remainder)
+            match = self._handle_custom_action(method, remainder, request)
             if match:
                 return match
 
             controller = getattr(self, remainder[0], None)
             if controller and not ismethod(controller):
-                return lookup_controller(controller, remainder[1:])
+                return lookup_controller(controller, remainder[1:], request)
 
         # check for regular POST/PUT requests
         controller = self._find_controller(method)
@@ -253,10 +293,13 @@ class RestController(object):
 
         abort(404)
 
-    def _handle_put(self, method, remainder):
-        return self._handle_post(method, remainder)
+    def _handle_put(self, method, remainder, request=None):
+        return self._handle_post(method, remainder, request)
 
-    def _handle_custom_action(self, method, remainder):
+    def _handle_custom_action(self, method, remainder, request=None):
+        if request is None:
+            self._raise_method_deprecation_warning(self._handle_custom_action)
+
         remainder = [r for r in remainder if r]
         if remainder:
             if method in ('put', 'delete'):
@@ -275,8 +318,23 @@ class RestController(object):
                 if controller:
                     return controller, remainder
 
-    def _set_routing_args(self, args):
+    def _set_routing_args(self, request, args):
         '''
         Sets default routing arguments.
         '''
         request.pecan.setdefault('routing_args', []).extend(args)
+
+    def _raise_method_deprecation_warning(self, handler):
+        warnings.warn(
+            (
+                "The function signature for %s.%s.%s is changing "
+                "in the next version of pecan.\nPlease update to: "
+                "`%s(self, method, remainder, request)`." % (
+                    self.__class__.__module__,
+                    self.__class__.__name__,
+                    handler.__name__,
+                    handler.__name__
+                )
+            ),
+            DeprecationWarning
+        )

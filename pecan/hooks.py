@@ -4,7 +4,6 @@ from inspect import getmembers
 from webob.exc import HTTPFound
 
 from .util import iscontroller, _cfg
-from .routing import lookup_controller
 
 __all__ = [
     'PecanHook', 'TransactionHook', 'HookController',
@@ -14,6 +13,10 @@ __all__ = [
 
 def walk_controller(root_class, controller, hooks):
     if not isinstance(controller, (int, dict)):
+        for hook in getattr(controller, '__hooks__', []):
+            # Append hooks from controller class definition
+            hooks.add(hook)
+
         for name, value in getmembers(controller):
             if name == 'controller':
                 continue
@@ -22,7 +25,7 @@ def walk_controller(root_class, controller, hooks):
 
             if iscontroller(value):
                 for hook in hooks:
-                    value._pecan.setdefault('hooks', []).append(hook)
+                    value._pecan.setdefault('hooks', set()).add(hook)
             elif hasattr(value, '__class__'):
                 if name.startswith('__') and name.endswith('__'):
                     continue
@@ -37,7 +40,12 @@ class HookControllerMeta(type):
     '''
 
     def __init__(cls, name, bases, dict_):
-        walk_controller(cls, cls, dict_.get('__hooks__', []))
+        hooks = set(dict_.get('__hooks__', []))
+        for base in bases:
+            # Add hooks from parent class and mixins
+            for hook in getattr(base, '__hooks__', []):
+                hooks.add(hook)
+        walk_controller(cls, cls, hooks)
 
 
 HookController = HookControllerMeta(
@@ -334,8 +342,7 @@ class RequestViewerHook(PecanHook):
         Specific to Pecan (not available in the request object)
         '''
         path = state.request.pecan['routing_path'].split('/')[1:]
-        controller, reminder = lookup_controller(state.app.root, path)
-        return controller.__str__().split()[2]
+        return state.controller.__str__().split()[2]
 
     def format_hooks(self, hooks):
         '''

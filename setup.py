@@ -1,8 +1,9 @@
 import sys
+import platform
 
 from setuptools import setup, find_packages
 
-version = '0.4.5'
+version = '0.6.1'
 
 #
 # determine requirements
@@ -20,15 +21,6 @@ except:
         import simplejson  # noqa
     except:
         requirements.append("simplejson >= 2.1.1")
-
-try:
-    from logging.config import dictConfig  # noqa
-except ImportError:
-    #
-    # This was introduced in Python 2.7 - the logutils package contains
-    # a backported replacement for 2.6
-    #
-    requirements.append('logutils')
 
 try:
     import argparse  # noqa
@@ -60,7 +52,9 @@ if sys.version_info < (2, 7):
 
 if sys.version_info < (3, 0):
     # These don't support Python3 yet - don't run their tests
-    tests_require += ['Kajiki']
+    if platform.python_implementation() != 'PyPy':
+        # Kajiki is not pypy-compatible
+        tests_require += ['Kajiki']
     tests_require += ['Genshi']
 else:
     # Genshi added Python3 support in 0.7
@@ -96,6 +90,7 @@ setup(
         'Programming Language :: Python :: 3.2',
         'Programming Language :: Python :: 3.3',
         'Programming Language :: Python :: 3.4',
+        'Programming Language :: Python :: Implementation :: PyPy',
         'Topic :: Internet :: WWW/HTTP :: WSGI',
         'Topic :: Software Development :: Libraries :: Application Frameworks'
     ],
@@ -118,6 +113,7 @@ setup(
     create = pecan.commands:CreateCommand
     [pecan.scaffold]
     base = pecan.scaffolds:BaseScaffold
+    rest-api = pecan.scaffolds:RestAPIScaffold
     [console_scripts]
     pecan = pecan.commands:CommandRunner.handle_command_line
     gunicorn_pecan = pecan.commands.serve:gunicorn_run

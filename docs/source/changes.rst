@@ -1,9 +1,52 @@
+0.6.1
+=====
+* Fixed a bug which causes pecan to mistakenly return HTTP 204 for non-empty
+  response bodies.
+
+0.6.0
+=====
+* Added support for disabling the `pecan.request` and `pecan.response`
+  threadlocals at the WSGI application level in favor of explicit reference
+  passing.  For more information, see :ref:`contextlocals`.
+* Added better support for hook composition via subclassing and mixins.  For
+  more information, see :ref:`attaching_hooks`.
+* Added support for specifying custom request and response implementations at
+  the WSGI application level for people who want to extend the functionality
+  provided by the base classes in `webob`.
+* Pecan controllers may now return an explicit `webob.Response` instance to
+  short-circuit Pecan's template rendering and serialization.
+* For generic methods that return HTTP 405, pecan now generates an `Allow`
+  header to communicate acceptable methods to the client.
+* Fixed a bug in adherence to RFC2616: if an exposed method returns no response
+  body (or namespace), pecan will now enforce an HTTP 204 response (instead of
+  HTTP 200).
+* Fixed a bug in adherence to RFC2616: when pecan responds with HTTP 204 or
+  HTTP 304, the `Content-Type` header is automatically stripped (because these
+  types of HTTP responses do not contain body content).
+* Fixed a bug: now when clients request JSON via an `Accept` header, `webob`
+  HTTP exceptions are serialized as JSON, not their native HTML representation.
+* Fixed a bug that broke applications which specified `default_renderer
+  = json`.
+
+0.5.0
+=====
+* This release adds formal support for pypy.
+* Added colored request logging to the `pecan serve` command.
+* Added a scaffold for easily generating a basic REST API.
+* Added the ability to pass arbitrary keyword arguments to
+  `pecan.testing.load_test_app`.
+* Fixed a recursion-related bug in the error document middleware.
+* Fixed a bug in the `gunicorn_pecan` command that caused `threading.local`
+  data to leak between eventlet/gevent green threads.
+* Improved documentation through fixes and narrative tutorials for sample pecan
+  applications.
+
 0.4.5
 =====
 * Fixed a trailing slash bug for `RestController`s that have a `_lookup` method.
 * Cleaned up the WSGI app reference from the threadlocal state on every request
   (to avoid potential memory leaks, especially when testing).
-* Improved pecan documentation and correctd intersphinx references.
+* Improved pecan documentation and corrected intersphinx references.
 * pecan supports Python 3.4.
 
 0.4.4

@@ -8,13 +8,7 @@ server = {
 app = {
     'root': '${package}.controllers.root.RootController',
     'modules': ['${package}'],
-    'static_root': '%(confdir)s/public',
-    'template_path': '%(confdir)s/${package}/templates',
-    'debug': True,
-    'errors': {
-        404: '/error/404',
-        '__force_dict__': True
-    }
+    'debug': True
 }
 
 logging = {

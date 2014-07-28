@@ -38,6 +38,7 @@ Narrative Documentation
    secure_controller.rst
    hooks.rst
    jsonify.rst
+   contextlocals.rst
    commands.rst
    development.rst
    deployment.rst
@@ -54,7 +55,9 @@ Cookbook and Common Patterns
    sessions.rst
    databases.rst
    errors.rst
-   
+   simple_forms_processing.rst
+   simple_ajax.rst
+
 
 API Documentation
 =================
