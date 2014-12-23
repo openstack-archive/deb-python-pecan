@@ -3,7 +3,7 @@ import platform
 
 from setuptools import setup, find_packages
 
-version = '0.6.1'
+version = '0.8.2'
 
 #
 # determine requirements
@@ -70,7 +70,7 @@ setup(
     name='pecan',
     version=version,
     description="A WSGI object-dispatching web framework, designed to be "
-                "lean and fast, with few dependancies.",
+                "lean and fast, with few dependencies.",
     long_description=None,
     classifiers=[
         'Development Status :: 5 - Production/Stable',

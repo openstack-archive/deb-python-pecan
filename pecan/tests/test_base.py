@@ -12,6 +12,7 @@ from webob.exc import HTTPNotFound
 from webtest import TestApp
 import six
 from six import b as b_
+from six import u as u_
 from six.moves import cStringIO as StringIO
 
 from pecan import (
@@ -68,6 +69,10 @@ class TestEmptyContent(PecanTestCase):
             def explicit_json_body(self):
                 response.json_body = {'foo': 'bar'}
 
+            @expose()
+            def non_unicode(self):
+                return chr(0xc0)
+
         return TestApp(Pecan(RootController()))
 
     def test_empty_index(self):
@@ -76,6 +81,10 @@ class TestEmptyContent(PecanTestCase):
         self.assertNotIn('Content-Type', r.headers)
         self.assertEqual(r.headers['Content-Length'], '0')
         self.assertEqual(len(r.body), 0)
+
+    def test_index_with_non_unicode(self):
+        r = self.app_.get('/non_unicode/')
+        self.assertEqual(r.status_int, 200)
 
     def test_explicit_body(self):
         r = self.app_.get('/explicit_body/')
@@ -432,6 +441,16 @@ class TestControllerArguments(PecanTestCase):
         assert r.status_int == 200
         assert r.body == b_('index: 4')
 
+    def test_explicit_json_kwargs(self):
+        r = self.app_.post_json('/', {'id': '4'})
+        assert r.status_int == 200
+        assert r.body == b_('index: 4')
+
+    def test_path_with_explicit_json_kwargs(self):
+        r = self.app_.post_json('/4', {'id': 'four'})
+        assert r.status_int == 200
+        assert r.body == b_('index: 4')
+
     def test_multiple_kwargs(self):
         r = self.app_.get('/?id=5&dummy=dummy')
         assert r.status_int == 200
@@ -439,6 +458,11 @@ class TestControllerArguments(PecanTestCase):
 
     def test_kwargs_from_root(self):
         r = self.app_.post('/', {'id': '6', 'dummy': 'dummy'})
+        assert r.status_int == 200
+        assert r.body == b_('index: 6')
+
+    def test_json_kwargs_from_root(self):
+        r = self.app_.post_json('/', {'id': '6', 'dummy': 'dummy'})
         assert r.status_int == 200
         assert r.body == b_('index: 6')
 
@@ -466,6 +490,11 @@ class TestControllerArguments(PecanTestCase):
 
     def test_positional_args_with_dictionary_kwargs(self):
         r = self.app_.post('/multiple', {'one': 'five', 'two': 'six'})
+        assert r.status_int == 200
+        assert r.body == b_('multiple: five, six')
+
+    def test_positional_args_with_json_kwargs(self):
+        r = self.app_.post_json('/multiple', {'one': 'five', 'two': 'six'})
         assert r.status_int == 200
         assert r.body == b_('multiple: five, six')
 
@@ -519,6 +548,11 @@ class TestControllerArguments(PecanTestCase):
         assert r.status_int == 200
         assert r.body == b_('optional: 4')
 
+    def test_optional_arg_with_json_kwargs(self):
+        r = self.app_.post_json('/optional', {'id': '4'})
+        assert r.status_int == 200
+        assert r.body == b_('optional: 4')
+
     def test_optional_arg_with_url_encoded_kwargs(self):
         r = self.app_.post('/optional', {'id': 'Some%20Number'})
         assert r.status_int == 200
@@ -526,6 +560,11 @@ class TestControllerArguments(PecanTestCase):
 
     def test_multiple_positional_arguments_with_dictionary_kwargs(self):
         r = self.app_.post('/optional/5', {'id': 'five'})
+        assert r.status_int == 200
+        assert r.body == b_('optional: 5')
+
+    def test_multiple_positional_arguments_with_json_kwargs(self):
+        r = self.app_.post_json('/optional/5', {'id': 'five'})
         assert r.status_int == 200
         assert r.body == b_('optional: 5')
 
@@ -546,6 +585,11 @@ class TestControllerArguments(PecanTestCase):
 
     def test_optional_arg_with_multiple_dictionary_kwargs(self):
         r = self.app_.post('/optional', {'id': '7', 'dummy': 'dummy'})
+        assert r.status_int == 200
+        assert r.body == b_('optional: 7')
+
+    def test_optional_arg_with_multiple_json_kwargs(self):
+        r = self.app_.post_json('/optional', {'id': '7', 'dummy': 'dummy'})
         assert r.status_int == 200
         assert r.body == b_('optional: 7')
 
@@ -613,6 +657,11 @@ class TestControllerArguments(PecanTestCase):
         assert r.status_int == 200
         assert r.body == b_('multiple_optional: 1, None, None')
 
+    def test_multiple_optional_positional_args_with_json_kwargs(self):
+        r = self.app_.post_json('/multiple_optional', {'one': '1'})
+        assert r.status_int == 200
+        assert r.body == b_('multiple_optional: 1, None, None')
+
     def test_multiple_optional_positional_args_with_encoded_dict_kwargs(self):
         r = self.app_.post('/multiple_optional', {'one': 'One%21'})
         assert r.status_int == 200
@@ -620,6 +669,11 @@ class TestControllerArguments(PecanTestCase):
 
     def test_multiple_optional_positional_args_and_dict_kwargs(self):
         r = self.app_.post('/multiple_optional/1', {'one': 'one'})
+        assert r.status_int == 200
+        assert r.body == b_('multiple_optional: 1, None, None')
+
+    def test_multiple_optional_positional_args_and_json_kwargs(self):
+        r = self.app_.post_json('/multiple_optional/1', {'one': 'one'})
         assert r.status_int == 200
         assert r.body == b_('multiple_optional: 1, None, None')
 
@@ -642,6 +696,14 @@ class TestControllerArguments(PecanTestCase):
 
     def test_multiple_optional_args_with_multiple_dict_kwargs(self):
         r = self.app_.post(
+            '/multiple_optional',
+            {'one': '1', 'two': '2', 'three': '3', 'four': '4'}
+        )
+        assert r.status_int == 200
+        assert r.body == b_('multiple_optional: 1, 2, 3')
+
+    def test_multiple_optional_args_with_multiple_json_kwargs(self):
+        r = self.app_.post_json(
             '/multiple_optional',
             {'one': '1', 'two': '2', 'three': '3', 'four': '4'}
         )
@@ -701,6 +763,14 @@ class TestControllerArguments(PecanTestCase):
         assert r.status_int == 200
         assert r.body == b_('variable_args: ')
 
+    def test_variable_args_with_json_kwargs(self):
+        r = self.app_.post_json(
+            '/variable_args',
+            {'id': '3', 'dummy': 'dummy'}
+        )
+        assert r.status_int == 200
+        assert r.body == b_('variable_args: ')
+
     def test_variable_kwargs(self):
         r = self.app_.get('/variable_kwargs')
         assert r.status_int == 200
@@ -724,6 +794,14 @@ class TestControllerArguments(PecanTestCase):
 
     def test_multiple_variable_kwargs_with_dict_kwargs(self):
         r = self.app_.post('/variable_kwargs', {'id': '3', 'dummy': 'dummy'})
+        assert r.status_int == 200
+        assert r.body == b_('variable_kwargs: dummy=dummy, id=3')
+
+    def test_multiple_variable_kwargs_with_json_kwargs(self):
+        r = self.app_.post_json(
+            '/variable_kwargs',
+            {'id': '3', 'dummy': 'dummy'}
+        )
         assert r.status_int == 200
         assert r.body == b_('variable_kwargs: dummy=dummy, id=3')
 
@@ -771,6 +849,14 @@ class TestControllerArguments(PecanTestCase):
         assert r.status_int == 200
         assert r.body == b_('variable_all: 6, day=12, month=1')
 
+    def test_variable_post_with_json_kwargs(self):
+        r = self.app_.post_json(
+            '/variable_all/6',
+            {'month': '1', 'day': '12'}
+        )
+        assert r.status_int == 200
+        assert r.body == b_('variable_all: 6, day=12, month=1')
+
     def test_variable_post_mixed(self):
         r = self.app_.post(
             '/variable_all/7',
@@ -778,6 +864,41 @@ class TestControllerArguments(PecanTestCase):
         )
         assert r.status_int == 200
         assert r.body == b_('variable_all: 7, day=12, id=seven, month=1')
+
+    def test_variable_post_mixed_with_json(self):
+        r = self.app_.post_json(
+            '/variable_all/7',
+            {'id': 'seven', 'month': '1', 'day': '12'}
+        )
+        assert r.status_int == 200
+        assert r.body == b_('variable_all: 7, day=12, id=seven, month=1')
+
+    def test_duplicate_query_parameters_GET(self):
+        r = self.app_.get('/variable_kwargs?list=1&list=2')
+        l = [u_('1'), u_('2')]
+        assert r.status_int == 200
+        assert r.body == b_('variable_kwargs: list=%s' % l)
+
+    def test_duplicate_query_parameters_POST(self):
+        r = self.app_.post('/variable_kwargs',
+                           {'list': ['1', '2']})
+        l = [u_('1'), u_('2')]
+        assert r.status_int == 200
+        assert r.body == b_('variable_kwargs: list=%s' % l)
+
+    def test_duplicate_query_parameters_POST_mixed(self):
+        r = self.app_.post('/variable_kwargs?list=1&list=2',
+                           {'list': ['3', '4']})
+        l = [u_('1'), u_('2'), u_('3'), u_('4')]
+        assert r.status_int == 200
+        assert r.body == b_('variable_kwargs: list=%s' % l)
+
+    def test_duplicate_query_parameters_POST_mixed_json(self):
+        r = self.app_.post('/variable_kwargs?list=1&list=2',
+                           {'list': 3})
+        l = [u_('1'), u_('2'), u_('3')]
+        assert r.status_int == 200
+        assert r.body == b_('variable_kwargs: list=%s' % l)
 
     def test_no_remainder(self):
         try:
@@ -835,8 +956,26 @@ class TestControllerArguments(PecanTestCase):
         assert r.status_int == 200
         assert r.body == b_('eater: 9, None, day=12, month=1')
 
+    def test_post_empty_remainder_with_json_kwargs(self):
+        r = self.app_.post_json('/eater/9/', {'month': '1', 'day': '12'})
+        assert r.status_int == 200
+        assert r.body == b_('eater: 9, None, day=12, month=1')
+
+    def test_post_remainder_with_json_kwargs(self):
+        r = self.app_.post_json('/eater/9', {'month': '1', 'day': '12'})
+        assert r.status_int == 200
+        assert r.body == b_('eater: 9, None, day=12, month=1')
+
     def test_post_many_remainders_with_many_kwargs(self):
         r = self.app_.post(
+            '/eater/10',
+            {'id': 'ten', 'month': '1', 'day': '12', 'dummy': 'dummy'}
+        )
+        assert r.status_int == 200
+        assert r.body == b_('eater: 10, dummy, day=12, month=1')
+
+    def test_post_many_remainders_with_many_json_kwargs(self):
+        r = self.app_.post_json(
             '/eater/10',
             {'id': 'ten', 'month': '1', 'day': '12', 'dummy': 'dummy'}
         )

@@ -1,3 +1,40 @@
+0.8.2
+=====
+* Fixes a bug that breaks support for multi-value query string variables (e.g.,
+  `?check=a&check=b`).
+
+0.8.1
+=====
+* Improved detection of infinite recursion for PecanHook and pypy.  This fixes
+  a bug discovered in pecan + pypy that could result in infinite recursion when
+  using the PecanHook metaclass.
+* Fixed a bug that prevented @exposed controllers from using @staticmethod.
+* Fixed a minor bug in the controller argument calculation.
+
+0.8.0
+=====
+ * For HTTP POSTs, map JSON request bodies to controller keyword arguments.
+ * Improved argspec detection and leniency for wrapped controllers.
+ * When path arguments are incorrect for RestController, return HTTP 404, not 400.
+ * When detecting non-content for HTTP 204, properly catch UnicodeDecodeError.
+ * Fixed a routing bug for generic subcontrollers.
+ * Fixed a bug in generic function handling when context locals are disabled.
+ * Fixed a bug that mixes up argument order for generic functions.
+ * Removed `assert` for flow control; it can be optimized away with `python -O`.
+
+0.7.0
+=====
+* Fixed an edge case in RestController routing which should have returned an
+  HTTP 400 but was instead raising an exception (and thus, HTTP 500).
+* Fixed an incorrect root logger configuration for quickstarted pecan projects.
+* Added `pecan.state.arguments`, a new feature for inspecting controller call
+  arguments.
+* Fixed an infinite recursion error in PecanHook application.  Subclassing both
+  `rest.RestController` and `hooks.HookController` resulted in an infinite
+  recursion error in hook application (which prevented applications from
+  starting).
+* Pecan's tests are now included in its source distribution.
+
 0.6.1
 =====
 * Fixed a bug which causes pecan to mistakenly return HTTP 204 for non-empty

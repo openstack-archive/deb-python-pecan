@@ -2,6 +2,7 @@ try:
     from simplejson import dumps, loads
 except ImportError:  # pragma: no cover
     from json import dumps, loads  # noqa
+from inspect import Arguments
 from itertools import chain, tee
 from mimetypes import guess_type, add_type
 from os.path import splitext
@@ -10,15 +11,20 @@ import operator
 import types
 
 import six
+if six.PY3:
+    from .compat import is_bound_method as ismethod
+else:
+    from inspect import ismethod
 
 from webob import (Request as WebObRequest, Response as WebObResponse, exc,
                    acceptparse)
+from webob.multidict import NestedMultiDict
 
 from .compat import urlparse, unquote_plus, izip
 from .secure import handle_security
 from .templating import RendererFactory
 from .routing import lookup_controller, NonCanonicalPath
-from .util import _cfg, encode_if_needed
+from .util import _cfg, encode_if_needed, getargspec
 from .middleware.recursive import ForwardRequestException
 
 
@@ -31,12 +37,14 @@ logger = logging.getLogger(__name__)
 
 class RoutingState(object):
 
-    def __init__(self, request, response, app, hooks=[], controller=None):
+    def __init__(self, request, response, app, hooks=[], controller=None,
+                 arguments=None):
         self.request = request
         self.response = response
         self.app = app
         self.hooks = hooks
         self.controller = controller
+        self.arguments = arguments
 
 
 class Request(WebObRequest):
@@ -251,7 +259,8 @@ class PecanBase(object):
             module = __import__(name, fromlist=fromlist)
             kallable = getattr(module, parts[-1])
             msg = "%s does not represent a callable class or function."
-            assert hasattr(kallable, '__call__'), msg % item
+            if not six.callable(kallable):
+                raise TypeError(msg % item)
             return kallable()
 
         raise ImportError('No item named %s' % item)
@@ -326,6 +335,7 @@ class PecanBase(object):
         passed the argument specification for the controller.
         '''
         args = []
+        varargs = []
         kwargs = dict()
         valid_args = argspec.args[1:]  # pop off `self`
         pecan_state = state.request.pecan
@@ -334,7 +344,7 @@ class PecanBase(object):
             return unquote_plus(x) if isinstance(x, six.string_types) \
                 else x
 
-        remainder = [_decode(x) for x in remainder]
+        remainder = [_decode(x) for x in remainder if x]
 
         if im_self is not None:
             args.append(im_self)
@@ -354,7 +364,7 @@ class PecanBase(object):
         if [i for i in remainder if i]:
             if not argspec[1]:
                 abort(404)
-            args.extend(remainder)
+            varargs.extend(remainder)
 
         # get the default positional arguments
         if argspec[3]:
@@ -377,7 +387,7 @@ class PecanBase(object):
                 if name not in argspec[0]:
                     kwargs[encode_if_needed(name)] = value
 
-        return args, kwargs
+        return args, varargs, kwargs
 
     def render(self, template, namespace):
         renderer = self.renderers.get(
@@ -492,25 +502,34 @@ class PecanBase(object):
             )
             raise exc.HTTPNotFound
 
-        # handle "before" hooks
-        self.handle_hooks(self.determine_hooks(controller), 'before', state)
-
         # fetch any parameters
         if req.method == 'GET':
-            params = dict(req.GET)
+            params = req.GET
+        elif req.content_type in ('application/json',
+                                  'application/javascript'):
+            try:
+                if not isinstance(req.json, dict):
+                    raise TypeError('%s is not a dict' % req.json)
+                params = NestedMultiDict(req.GET, req.json)
+            except (TypeError, ValueError):
+                params = req.params
         else:
-            params = dict(req.params)
+            params = req.params
 
         # fetch the arguments for the controller
-        args, kwargs = self.get_args(
+        args, varargs, kwargs = self.get_args(
             state,
-            params,
+            params.mixed(),
             remainder,
             cfg['argspec'],
             im_self
         )
+        state.arguments = Arguments(args, varargs, kwargs)
 
-        return controller, args, kwargs
+        # handle "before" hooks
+        self.handle_hooks(self.determine_hooks(controller), 'before', state)
+
+        return controller, args+varargs, kwargs
 
     def invoke_controller(self, controller, args, kwargs, state):
         '''
@@ -521,6 +540,15 @@ class PecanBase(object):
         req = state.request
         resp = state.response
         pecan_state = req.pecan
+
+        # If a keyword is supplied via HTTP GET or POST arguments, but the
+        # function signature does not allow it, just drop it (rather than
+        # generating a TypeError).
+        argspec = getargspec(controller)
+        keys = kwargs.keys()
+        for key in keys:
+            if key not in argspec.args and not argspec.keywords:
+                kwargs.pop(key)
 
         # get the result from the controller
         result = controller(*args, **kwargs)
@@ -566,33 +594,43 @@ class PecanBase(object):
             resp.text = result
         elif result:
             resp.body = result
-        elif response.status_int == 200:
+
+        if pecan_state['content_type']:
+            # set the content type
+            resp.content_type = pecan_state['content_type']
+
+    def _handle_empty_response_body(self, state):
+        # Enforce HTTP 204 for responses which contain no body
+        if state.response.status_int == 200:
             # If the response is a generator...
-            if isinstance(response.app_iter, types.GeneratorType):
+            if isinstance(state.response.app_iter, types.GeneratorType):
                 # Split the generator into two so we can peek at one of them
                 # and determine if there is any response body content
-                a, b = tee(response.app_iter)
+                a, b = tee(state.response.app_iter)
                 try:
                     next(a)
                 except StopIteration:
                     # If we hit StopIteration, the body is empty
-                    resp.status = 204
+                    state.response.status = 204
                 finally:
-                    resp.app_iter = b
+                    state.response.app_iter = b
             else:
                 text = None
-                if response.charset:
-                    # `response.text` cannot be accessed without a charset
-                    # (because we don't know which encoding to use)
-                    text = response.text
-                if not any((response.body, text)):
-                    resp.status = 204
+                if state.response.charset:
+                    # `response.text` cannot be accessed without a valid
+                    # charset (because we don't know which encoding to use)
+                    try:
+                        text = state.response.text
+                    except UnicodeDecodeError:
+                        # If a valid charset is not specified, don't bother
+                        # trying to guess it (because there's obviously
+                        # content, so we know this shouldn't be a 204)
+                        pass
+                if not any((state.response.body, text)):
+                    state.response.status = 204
 
-        if resp.status_int in (204, 304):
-            resp.content_type = None
-        elif pecan_state['content_type']:
-            # set the content type
-            resp.content_type = pecan_state['content_type']
+        if state.response.status_int in (204, 304):
+            state.response.content_type = None
 
     def __call__(self, environ, start_response):
         '''
@@ -663,6 +701,8 @@ class PecanBase(object):
                 self.determine_hooks(state.controller), 'after', state
             )
 
+        self._handle_empty_response_body(state)
+
         # get the response
         return state.response(environ, start_response)
 
@@ -673,15 +713,23 @@ class ExplicitPecan(PecanBase):
         # When comparing the argspec of the method to GET/POST params,
         # ignore the implicit (req, resp) at the beginning of the function
         # signature
-        signature_error = TypeError(
-            'When `use_context_locals` is `False`, pecan passes an explicit '
-            'reference to the request and response as the first two arguments '
-            'to the controller.\nChange the `%s.%s.%s` signature to accept '
-            'exactly 2 initial arguments (req, resp)' % (
+        if hasattr(state.controller, '__self__'):
+            _repr = '.'.join((
                 state.controller.__self__.__class__.__module__,
                 state.controller.__self__.__class__.__name__,
                 state.controller.__name__
-            )
+            ))
+        else:
+            _repr = '.'.join((
+                state.controller.__module__,
+                state.controller.__name__
+            ))
+
+        signature_error = TypeError(
+            'When `use_context_locals` is `False`, pecan passes an explicit '
+            'reference to the request and response as the first two arguments '
+            'to the controller.\nChange the `%s` signature to accept exactly '
+            '2 initial arguments (req, resp)' % _repr
         )
         try:
             positional = argspec.args[:]
@@ -691,11 +739,17 @@ class ExplicitPecan(PecanBase):
         except IndexError:
             raise signature_error
 
-        args, kwargs = super(ExplicitPecan, self).get_args(
+        args, varargs, kwargs = super(ExplicitPecan, self).get_args(
             state, all_params, remainder, argspec, im_self
         )
-        args = [state.request, state.response] + args
-        return args, kwargs
+
+        if ismethod(state.controller):
+            args = [state.request, state.response] + args
+        else:
+            # generic controllers have an explicit self *first*
+            # (because they're decorated functions, not instance methods)
+            args[1:1] = [state.request, state.response]
+        return args, varargs, kwargs
 
 
 class Pecan(PecanBase):
@@ -747,12 +801,14 @@ class Pecan(PecanBase):
             state.hooks = []
             state.app = self
             state.controller = None
+            state.arguments = None
             return super(Pecan, self).__call__(environ, start_response)
         finally:
             del state.hooks
             del state.request
             del state.response
             del state.controller
+            del state.arguments
             del state.app
 
     def init_context_local(self, local_factory):
@@ -766,6 +822,7 @@ class Pecan(PecanBase):
         state.response = _state.response
         controller, args, kw = super(Pecan, self).find_controller(_state)
         state.controller = controller
+        state.arguments = _state.arguments
         return controller, args, kw
 
     def handle_hooks(self, hooks, *args, **kw):

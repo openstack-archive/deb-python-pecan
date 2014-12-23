@@ -1,4 +1,4 @@
-from inspect import getargspec, ismethod
+from inspect import ismethod
 import warnings
 
 from webob import exc
@@ -7,7 +7,7 @@ import six
 from .core import abort
 from .decorators import expose
 from .routing import lookup_controller, handle_lookup_traversal
-from .util import iscontroller
+from .util import iscontroller, getargspec
 
 
 class RestController(object):
@@ -42,6 +42,22 @@ class RestController(object):
         except AttributeError:
             return argspec.args[3:]
         return argspec.args[1:]
+
+    def _handle_bad_rest_arguments(self, controller, remainder, request):
+        """
+        Ensure that the argspec for a discovered controller actually matched
+        the positional arguments in the request path.  If not, raise
+        a webob.exc.HTTPBadRequest.
+        """
+        argspec = self._get_args_for_controller(controller)
+        fixed_args = len(argspec) - len(
+            request.pecan.get('routing_args', [])
+        )
+        if len(remainder) < fixed_args:
+            # For controllers that are missing intermediate IDs
+            # (e.g., /authors/books vs /authors/1/books), return a 404 for an
+            # invalid path.
+            abort(404)
 
     @expose()
     def _route(self, args, request=None):
@@ -89,10 +105,10 @@ class RestController(object):
                 _lookup_result = self._handle_lookup(args, request)
                 if _lookup_result:
                     return _lookup_result
-        except exc.HTTPNotFound:
+        except (exc.HTTPClientError, exc.HTTPNotFound):
             #
-            # If the matching handler results in a 404, attempt to handle
-            # a _lookup method (if it exists)
+            # If the matching handler results in a 400 or 404, attempt to
+            # handle a _lookup method (if it exists)
             #
             _lookup_result = self._handle_lookup(args, request)
             if _lookup_result:
@@ -201,14 +217,10 @@ class RestController(object):
 
         # route to a get_all or get if no additional parts are available
         if not remainder or remainder == ['']:
+            remainder = list(six.moves.filter(bool, remainder))
             controller = self._find_controller('get_all', 'get')
             if controller:
-                argspec = self._get_args_for_controller(controller)
-                fixed_args = len(argspec) - len(
-                    request.pecan.get('routing_args', [])
-                )
-                if len(remainder) < fixed_args:
-                    abort(404)
+                self._handle_bad_rest_arguments(controller, remainder, request)
                 return controller, []
             abort(404)
 
@@ -232,6 +244,7 @@ class RestController(object):
         # finally, check for the regular get_one/get requests
         controller = self._find_controller('get_one', 'get')
         if controller:
+            self._handle_bad_rest_arguments(controller, remainder, request)
             return controller, remainder
 
         abort(404)

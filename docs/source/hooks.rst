@@ -71,6 +71,10 @@ response objects, and which controller was selected by Pecan's routing::
                 # and used to generate the response body
                 #
                 assert state.controller.__func__ is RootController.index.__func__
+                assert isinstance(state.arguments, inspect.Arguments)
+                print state.arguments.args
+                print state.arguments.varargs
+                print state.arguments.keywords
             assert isinstance(state.request, webob.Request)
             assert isinstance(state.response, webob.Response)
             assert isinstance(state.hooks, list)
@@ -386,7 +390,7 @@ Blacklisting Certain Paths
 ..........................
 
 Sometimes it's annoying to get information about *every* single
-request. To limit the ouptput, pass the list of URL paths for which
+request. To limit the output, pass the list of URL paths for which
 you do not want data as the ``blacklist``.
 
 The matching is done at the start of the URL path, so be careful when using
