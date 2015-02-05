@@ -35,12 +35,14 @@ override_dh_auto_install:
 	sed -i 1' s#python3.4#python3#' $(CURDIR)/debian/python3-pecan/usr/bin/pecan-python3
 
 override_dh_auto_test:
+ifeq (,$(findstring nocheck, $(DEB_BUILD_OPTIONS)))
 	set -e && for pyvers in $(PYTHONS) ; do \
 		python$$pyvers setup.py test -v ; \
 	done
 	set -e && for pyvers in $(PYTHON3S) ; do \
 		python$$pyvers setup.py test -v || true ; \
 	done
+endif
 
 override_dh_sphinxdoc:
 ifeq (,$(findstring nodocs, $(DEB_BUILD_OPTIONS)))
