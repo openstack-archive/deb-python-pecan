@@ -34,6 +34,12 @@ override_dh_auto_install:
 	sed -i 1' s#python3.4#python3#' $(CURDIR)/debian/python3-pecan/usr/bin/gunicorn_pecan-python3
 	sed -i 1' s#python3.4#python3#' $(CURDIR)/debian/python3-pecan/usr/bin/pecan-python3
 
+	# Cleanup __pycache__ dirs.
+	rm -rf debian/python-pecan/usr/lib/python2.7/dist-packages/pecan/tests/templates/__pycache__
+	rm -rf debian/python-pecan/usr/lib/python2.7/dist-packages/pecan/tests/__pycache__
+	rm -rf debian/python-pecan/usr/lib/python2.7/dist-packages/pecan/tests/scaffold_fixtures/__pycache__
+	rm -rf debian/python-pecan/usr/lib/python2.7/dist-packages/pecan/tests/middleware/__pycache__
+
 override_dh_auto_test:
 ifeq (,$(findstring nocheck, $(DEB_BUILD_OPTIONS)))
 	set -e && for pyvers in $(PYTHONS) ; do \
