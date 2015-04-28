@@ -1,6 +1,7 @@
 python-pecan (0.8.2-1) unstable; urgency=medium
 
   * New upstream release.
+  * Removed compat/tests expat-vinay in debian/copyright.
 
  -- Thomas Goirand <zigo@debian.org>  Tue, 23 Dec 2014 15:35:57 +0800
 
