@@ -2,25 +2,25 @@ Source: python-pecan
 Section: python
 Priority: optional
 Maintainer: PKG OpenStack <openstack-devel@lists.alioth.debian.org>
-Uploaders: Julien Danjou <acid@debian.org>,
-           Thomas Goirand <zigo@debian.org>,
-           Mehdi Abaakouk <sileht@sileht.net>
+Uploaders: Thomas Goirand <zigo@debian.org>,
 Build-Depends: debhelper (>= 9),
-               python-all (>= 2.6.6-3~),
+               dh-python,
+               python-all,
                python-setuptools,
                python-sphinx,
-               python3-all (>= 3.2),
-               python3-setuptools
+               python3-all,
+               python3-setuptools,
 Build-Depends-Indep: gunicorn,
                      python-genshi,
                      python-jinja2,
                      python-kajiki,
                      python-logutils,
-                     python-mako (>= 0.4.0),
+                     python-mako,
                      python-markupsafe,
                      python-mock,
                      python-simplegeneric,
                      python-singledispatch,
+                     python-six,
                      python-sqlalchemy,
                      python-unittest2,
                      python-webob,
@@ -29,7 +29,7 @@ Build-Depends-Indep: gunicorn,
                      python3-jinja2,
                      python3-kajiki,
                      python3-logutils,
-                     python3-mako (>= 0.4.0),
+                     python3-mako,
                      python3-markupsafe,
                      python3-mock,
                      python3-simplegeneric,
@@ -45,11 +45,8 @@ Homepage: http://pypi.python.org/pypi/pecan
 
 Package: python-pecan
 Architecture: all
-Pre-Depends: dpkg (>= 1.15.6~)
-Depends: python (<< 2.8),
-         python (>= 2.6.6-7~),
-         python-logutils,
-         python-mako (>= 0.4.0),
+Depends: python-logutils,
+         python-mako,
          python-markupsafe,
          python-simplegeneric,
          python-singledispatch,
@@ -57,7 +54,7 @@ Depends: python (<< 2.8),
          python-webob,
          python-webtest,
          ${misc:Depends},
-         ${python:Depends}
+         ${python:Depends},
 Description: WSGI object-dispatching web framework - Python 2.x
  The Pecan Python module is a WSGI object-dispatching web framework designed to
  be lean and fast with few dependencies. Pecan comes bundled with a lightweight
@@ -74,17 +71,16 @@ Description: WSGI object-dispatching web framework - Python 2.x
 
 Package: python3-pecan
 Architecture: all
-Pre-Depends: dpkg (>= 1.15.6~)
-Depends: python3 (>= 3.2),
-         python3-logutils,
-         python3-mako (>= 0.4.0),
+Depends: python3-logutils,
+         python3-mako,
          python3-markupsafe,
          python3-simplegeneric,
          python3-singledispatch,
          python3-six,
          python3-webob,
          python3-webtest,
-         ${misc:Depends}
+         ${misc:Depends},
+         ${python3:Depends},
 Description: WSGI object-dispatching web framework - Python 3.x
  The Pecan Python module is a WSGI object-dispatching web framework designed to
  be lean and fast with few dependencies. Pecan comes bundled with a lightweight
