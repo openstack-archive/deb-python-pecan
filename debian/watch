@@ -1,2 +1,2 @@
 version=3
-https://github.com/dreamhost/pecan/tags .*/(\d[\d\.]+)\.tar\.gz
+https://github.com/stackforge/pecan/tags .*/(\d[\d\.]+)\.tar\.gz
