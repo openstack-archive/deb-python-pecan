@@ -1,11 +1,21 @@
-from webtest import TestApp
+# -*- coding: utf-8 -*-
+
+import struct
+import sys
 import warnings
+
+if sys.version_info < (2, 7):
+    import unittest2 as unittest  # pragma: nocover
+else:
+    import unittest  # pragma: nocover
+
 try:
     from simplejson import dumps, loads
 except:
     from json import dumps, loads  # noqa
 
-from six import b as b_
+from six import b as b_, PY3
+from webtest import TestApp
 
 from pecan import abort, expose, make_app, response, redirect
 from pecan.rest import RestController
@@ -240,8 +250,8 @@ class TestRestController(PecanTestCase):
         assert r.body == b_('OTHERS')
 
         # test an invalid custom action
-        r = app.get('/things?_method=BAD', status=404)
-        assert r.status_int == 404
+        r = app.get('/things?_method=BAD', status=405)
+        assert r.status_int == 405
 
         # test custom "GET" request "count"
         r = app.get('/things/count')
@@ -289,7 +299,7 @@ class TestRestController(PecanTestCase):
         assert r.status_int == 200
         assert r.body == b_(dumps(dict(items=ThingsController.data)))
 
-    def test_404_with_lookup(self):
+    def test_405_with_lookup(self):
 
         class LookupController(RestController):
 
@@ -312,10 +322,10 @@ class TestRestController(PecanTestCase):
         # create the app
         app = TestApp(make_app(RootController()))
 
-        # these should 404
+        # these should 405
         for path in ('/things', '/things/'):
             r = app.get(path, expect_errors=True)
-            assert r.status_int == 404
+            assert r.status_int == 405
 
         r = app.get('/things/foo')
         assert r.status_int == 200
@@ -803,53 +813,53 @@ class TestRestController(PecanTestCase):
         app = TestApp(make_app(RootController()))
 
         # test get_all
-        r = app.get('/things', status=404)
-        assert r.status_int == 404
+        r = app.get('/things', status=405)
+        assert r.status_int == 405
 
         # test get_one
-        r = app.get('/things/1', status=404)
-        assert r.status_int == 404
+        r = app.get('/things/1', status=405)
+        assert r.status_int == 405
 
         # test post
-        r = app.post('/things', {'value': 'one'}, status=404)
-        assert r.status_int == 404
+        r = app.post('/things', {'value': 'one'}, status=405)
+        assert r.status_int == 405
 
         # test edit
-        r = app.get('/things/1/edit', status=404)
-        assert r.status_int == 404
+        r = app.get('/things/1/edit', status=405)
+        assert r.status_int == 405
 
         # test put
-        r = app.put('/things/1', {'value': 'ONE'}, status=404)
+        r = app.put('/things/1', {'value': 'ONE'}, status=405)
 
         # test put with _method parameter and GET
         r = app.get('/things/1?_method=put', {'value': 'ONE!'}, status=405)
         assert r.status_int == 405
 
         # test put with _method parameter and POST
-        r = app.post('/things/1?_method=put', {'value': 'ONE!'}, status=404)
-        assert r.status_int == 404
+        r = app.post('/things/1?_method=put', {'value': 'ONE!'}, status=405)
+        assert r.status_int == 405
 
         # test get delete
-        r = app.get('/things/1/delete', status=404)
-        assert r.status_int == 404
+        r = app.get('/things/1/delete', status=405)
+        assert r.status_int == 405
 
         # test delete
-        r = app.delete('/things/1', status=404)
-        assert r.status_int == 404
+        r = app.delete('/things/1', status=405)
+        assert r.status_int == 405
 
         # test delete with _method parameter and GET
         r = app.get('/things/1?_method=DELETE', status=405)
         assert r.status_int == 405
 
         # test delete with _method parameter and POST
-        r = app.post('/things/1?_method=DELETE', status=404)
-        assert r.status_int == 404
+        r = app.post('/things/1?_method=DELETE', status=405)
+        assert r.status_int == 405
 
         # test "RESET" custom action
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            r = app.request('/things', method='RESET', status=404)
-            assert r.status_int == 404
+            r = app.request('/things', method='RESET', status=405)
+            assert r.status_int == 405
 
     def test_nested_rest_with_missing_intermediate_id(self):
 
@@ -1359,6 +1369,27 @@ class TestRestController(PecanTestCase):
         assert r.status_int == 200
         assert r.body == b_("DEFAULT missing")
 
+    def test_rest_with_non_utf_8_body(self):
+        if PY3:
+            # webob+PY3 doesn't suffer from this bug; the POST parsing in PY3
+            # seems to more gracefully detect the bytestring
+            return
+
+        class FooController(RestController):
+
+            @expose()
+            def post(self):
+                return "POST"
+
+        class RootController(RestController):
+            foo = FooController()
+
+        app = TestApp(make_app(RootController()))
+
+        data = struct.pack('255h', *range(0, 255))
+        r = app.post('/foo/', data, expect_errors=True)
+        assert r.status_int == 400
+
     def test_dynamic_rest_lookup(self):
         class BarController(RestController):
             @expose()
@@ -1458,3 +1489,152 @@ class TestRestController(PecanTestCase):
         r = app.delete('/foos/foo/bars/bar')
         assert r.status_int == 200
         assert r.body == b_('DELETE_BAR')
+
+    def test_method_not_allowed_get(self):
+        class ThingsController(RestController):
+
+            @expose()
+            def put(self, id_, value):
+                response.status = 200
+
+            @expose()
+            def delete(self, id_):
+                response.status = 200
+
+        app = TestApp(make_app(ThingsController()))
+        r = app.get('/', status=405)
+        assert r.status_int == 405
+        assert r.headers['Allow'] == 'DELETE, PUT'
+
+    def test_method_not_allowed_post(self):
+        class ThingsController(RestController):
+
+            @expose()
+            def get_one(self):
+                return dict()
+
+        app = TestApp(make_app(ThingsController()))
+        r = app.post('/', {'foo': 'bar'}, status=405)
+        assert r.status_int == 405
+        assert r.headers['Allow'] == 'GET'
+
+    def test_method_not_allowed_put(self):
+        class ThingsController(RestController):
+
+            @expose()
+            def get_one(self):
+                return dict()
+
+        app = TestApp(make_app(ThingsController()))
+        r = app.put('/123', status=405)
+        assert r.status_int == 405
+        assert r.headers['Allow'] == 'GET'
+
+    def test_method_not_allowed_delete(self):
+        class ThingsController(RestController):
+
+            @expose()
+            def get_one(self):
+                return dict()
+
+        app = TestApp(make_app(ThingsController()))
+        r = app.delete('/123', status=405)
+        assert r.status_int == 405
+        assert r.headers['Allow'] == 'GET'
+
+    def test_proper_allow_header_multiple_gets(self):
+        class ThingsController(RestController):
+
+            @expose()
+            def get_all(self):
+                return dict()
+
+            @expose()
+            def get(self):
+                return dict()
+
+        app = TestApp(make_app(ThingsController()))
+        r = app.put('/123', status=405)
+        assert r.status_int == 405
+        assert r.headers['Allow'] == 'GET'
+
+    def test_rest_with_utf8_uri(self):
+
+        class FooController(RestController):
+            key = chr(0x1F330) if PY3 else unichr(0x1F330)
+            data = {key: 'Success!'}
+
+            @expose()
+            def get_one(self, id_):
+                return self.data[id_]
+
+            @expose()
+            def get_all(self):
+                return "Hello, World!"
+
+            @expose()
+            def put(self, id_, value):
+                return self.data[id_]
+
+            @expose()
+            def delete(self, id_):
+                return self.data[id_]
+
+        class RootController(RestController):
+            foo = FooController()
+
+        app = TestApp(make_app(RootController()))
+
+        r = app.get('/foo/%F0%9F%8C%B0')
+        assert r.status_int == 200
+        assert r.body == b'Success!'
+
+        r = app.put('/foo/%F0%9F%8C%B0', {'value': 'pecans'})
+        assert r.status_int == 200
+        assert r.body == b'Success!'
+
+        r = app.delete('/foo/%F0%9F%8C%B0')
+        assert r.status_int == 200
+        assert r.body == b'Success!'
+
+        r = app.get('/foo/')
+        assert r.status_int == 200
+        assert r.body == b'Hello, World!'
+
+    @unittest.skipIf(not PY3, "test is Python3 specific")
+    def test_rest_with_utf8_endpoint(self):
+        class ChildController(object):
+            @expose()
+            def index(self):
+                return 'Hello, World!'
+
+        class FooController(RestController):
+            pass
+
+        # okay, so it's technically a chestnut, but close enough...
+        setattr(FooController, '🌰', ChildController())
+
+        class RootController(RestController):
+            foo = FooController()
+
+        app = TestApp(make_app(RootController()))
+
+        r = app.get('/foo/%F0%9F%8C%B0/')
+        assert r.status_int == 200
+        assert r.body == b'Hello, World!'
+
+
+class TestExplicitRoute(PecanTestCase):
+
+    def test_alternate_route(self):
+
+        class RootController(RestController):
+
+            @expose(route='some-path')
+            def get_all(self):
+                return "Hello, World!"
+
+        self.assertRaises(
+            ValueError,
+            RootController
+        )

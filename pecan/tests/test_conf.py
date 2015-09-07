@@ -1,9 +1,13 @@
 import os
 import sys
 import tempfile
+import unittest
 
-from pecan.tests import PecanTestCase
 from six import b as b_
+from webtest import TestApp
+
+import pecan
+from pecan.tests import PecanTestCase
 
 
 __here__ = os.path.dirname(__file__)
@@ -143,6 +147,22 @@ class TestConf(PecanTestCase):
                 configuration.conf_from_file,
                 f.name
             )
+
+    def test_config_with_non_package_relative_import(self):
+        from pecan import configuration
+        with tempfile.NamedTemporaryFile('wb', suffix='.py') as f:
+            f.write(b_('\n'.join(['from . import variables'])))
+            f.flush()
+            configuration.Config({})
+
+            try:
+                configuration.conf_from_file(f.name)
+            except (ValueError, SystemError) as e:
+                assert 'relative import' in str(e)
+            else:
+                raise AssertionError(
+                    "A relative import-related error should have been raised"
+                )
 
     def test_config_with_bad_import(self):
         from pecan import configuration
@@ -328,3 +348,26 @@ class TestConfFromEnv(PecanTestCase):
         __here__ = os.path.abspath(__file__)
         os.environ['PECAN_CONFIG'] = __here__
         assert self.get_conf_path_from_env() == __here__
+
+
+class TestConfigCleanup(unittest.TestCase):
+
+    def setUp(self):
+        class RootController(object):
+            @pecan.expose()
+            def index(self):
+                return 'Hello, World!'
+        self.app = TestApp(pecan.Pecan(RootController()))
+
+    def tearDown(self):
+        pecan.configuration.set_config(pecan.configuration.DEFAULT,
+                                       overwrite=True)
+
+    def test_conf_default(self):
+        assert pecan.conf.server.to_dict() == {
+            'port': '8080', 'host': '0.0.0.0'
+        }
+
+    def test_conf_changed(self):
+        pecan.conf.server = pecan.configuration.Config({'port': '80'})
+        assert pecan.conf.server.to_dict() == {'port': '80'}

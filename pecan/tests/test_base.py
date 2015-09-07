@@ -1,14 +1,14 @@
+# -*- coding: utf-8 -*-
+
 import sys
 import os
 import json
+import traceback
 import warnings
-if sys.version_info < (2, 7):
-    import unittest2 as unittest  # pragma: nocover
-else:
-    import unittest  # pragma: nocover
 
 import webob
 from webob.exc import HTTPNotFound
+import mock
 from webtest import TestApp
 import six
 from six import b as b_
@@ -17,13 +17,18 @@ from six.moves import cStringIO as StringIO
 
 from pecan import (
     Pecan, Request, Response, expose, request, response, redirect,
-    abort, make_app, override_template, render
+    abort, make_app, override_template, render, route
 )
 from pecan.templating import (
     _builtin_renderers as builtin_renderers, error_formatters
 )
 from pecan.decorators import accept_noncanonical
 from pecan.tests import PecanTestCase
+
+if sys.version_info < (2, 7):
+    import unittest2 as unittest  # pragma: nocover
+else:
+    import unittest  # pragma: nocover
 
 
 class SampleRootController(object):
@@ -146,6 +151,23 @@ class TestAppIterFile(PecanTestCase):
         assert len(r.body) == 0
 
 
+class TestInvalidURLEncoding(PecanTestCase):
+
+    @property
+    def app_(self):
+        class RootController(object):
+
+            @expose()
+            def _route(self, args, request):
+                assert request.path
+
+        return TestApp(Pecan(RootController()))
+
+    def test_rest_with_non_utf_8_body(self):
+        r = self.app_.get('/%aa/', expect_errors=True)
+        assert r.status_int == 400
+
+
 class TestIndexRouting(PecanTestCase):
 
     @property
@@ -238,6 +260,35 @@ class TestObjectDispatch(PecanTestCase):
         r = self.app_.get('/sub/sub/deeper')
         assert r.status_int == 200
         assert r.body == b_('/sub/sub/deeper')
+
+
+@unittest.skipIf(not six.PY3, "tests are Python3 specific")
+class TestUnicodePathSegments(PecanTestCase):
+
+    def test_unicode_methods(self):
+        class RootController(object):
+            pass
+        setattr(RootController, '🌰', expose()(lambda self: 'Hello, World!'))
+        app = TestApp(Pecan(RootController()))
+
+        resp = app.get('/%F0%9F%8C%B0/')
+        assert resp.status_int == 200
+        assert resp.body == b_('Hello, World!')
+
+    def test_unicode_child(self):
+        class ChildController(object):
+            @expose()
+            def index(self):
+                return 'Hello, World!'
+
+        class RootController(object):
+            pass
+        setattr(RootController, '🌰', ChildController())
+        app = TestApp(Pecan(RootController()))
+
+        resp = app.get('/%F0%9F%8C%B0/')
+        assert resp.status_int == 200
+        assert resp.body == b_('Hello, World!')
 
 
 class TestLookups(PecanTestCase):
@@ -377,6 +428,11 @@ class TestControllerArguments(PecanTestCase):
                     ', '.join(list(args) + data)
                 )
 
+            @staticmethod
+            @expose()
+            def static(id):
+                return "id is %s" % id
+
             @expose()
             def _route(self, args, request):
                 if hasattr(self, args[0]):
@@ -407,6 +463,16 @@ class TestControllerArguments(PecanTestCase):
         assert r.status_int == 200
         assert r.body == b_('index: This is a test!')
 
+    def test_single_argument_with_plus(self):
+        r = self.app_.get('/foo+bar')
+        assert r.status_int == 200
+        assert r.body == b_('index: foo+bar')
+
+    def test_single_argument_with_encoded_plus(self):
+        r = self.app_.get('/foo%2Bbar')
+        assert r.status_int == 200
+        assert r.body == b_('index: foo+bar')
+
     def test_two_arguments(self):
         r = self.app_.get('/1/dummy', status=404)
         assert r.status_int == 404
@@ -420,6 +486,16 @@ class TestControllerArguments(PecanTestCase):
         r = self.app_.get('/?id=This%20is%20a%20test%21')
         assert r.status_int == 200
         assert r.body == b_('index: This is a test!')
+
+    def test_keyword_argument_with_plus(self):
+        r = self.app_.get('/?id=foo+bar')
+        assert r.status_int == 200
+        assert r.body == b_('index: foo bar')
+
+    def test_keyword_argument_with_encoded_plus(self):
+        r = self.app_.get('/?id=foo%2Bbar')
+        assert r.status_int == 200
+        assert r.body == b_('index: foo+bar')
 
     def test_argument_and_keyword_argument(self):
         r = self.app_.get('/3?id=three')
@@ -900,6 +976,11 @@ class TestControllerArguments(PecanTestCase):
         assert r.status_int == 200
         assert r.body == b_('variable_kwargs: list=%s' % l)
 
+    def test_staticmethod(self):
+        r = self.app_.get('/static/foobar')
+        assert r.status_int == 200
+        assert r.body == b_('id is foobar')
+
     def test_no_remainder(self):
         try:
             r = self.app_.get('/eater')
@@ -1040,6 +1121,20 @@ class TestAbort(PecanTestCase):
         app = TestApp(Pecan(RootController()))
         r = app.get('/', status=401)
         assert r.status_int == 401
+
+    def test_abort_keeps_traceback(self):
+        last_exc, last_traceback = None, None
+
+        try:
+            try:
+                raise Exception('Bottom Exception')
+            except:
+                abort(404)
+        except Exception:
+            last_exc, _, last_traceback = sys.exc_info()
+
+        assert last_exc is HTTPNotFound
+        assert 'Bottom Exception' in traceback.format_tb(last_traceback)[-1]
 
 
 class TestScriptName(PecanTestCase):
@@ -1306,24 +1401,28 @@ class TestFileTypeExtensions(PecanTestCase):
         return TestApp(Pecan(RootController()))
 
     def test_html_extension(self):
-        r = self.app_.get('/index.html')
-        assert r.status_int == 200
-        assert r.body == b_('.html')
+        for path in ('/index.html', '/index.html/'):
+            r = self.app_.get(path)
+            assert r.status_int == 200
+            assert r.body == b_('.html')
 
     def test_image_extension(self):
-        r = self.app_.get('/image.png')
-        assert r.status_int == 200
-        assert r.body == b_('.png')
+        for path in ('/index.png', '/index.png/'):
+            r = self.app_.get(path)
+            assert r.status_int == 200
+            assert r.body == b_('.png')
 
     def test_hidden_file(self):
-        r = self.app_.get('/.vimrc')
-        assert r.status_int == 204
-        assert r.body == b_('')
+        for path in ('/.vimrc', '/.vimrc/'):
+            r = self.app_.get(path)
+            assert r.status_int == 204
+            assert r.body == b_('')
 
     def test_multi_dot_extension(self):
-        r = self.app_.get('/gradient.min.js')
-        assert r.status_int == 200
-        assert r.body == b_('.js')
+        for path in ('/gradient.min.js', '/gradient.min.js/'):
+            r = self.app_.get(path)
+            assert r.status_int == 200
+            assert r.body == b_('.js')
 
     def test_bad_content_type(self):
         class RootController(object):
@@ -1373,6 +1472,39 @@ class TestFileTypeExtensions(PecanTestCase):
         r = app.get('/index.html')
         assert r.status_int == 200
         assert r.body == b_('SOME VALUE')
+
+    def test_content_type_guessing_disabled(self):
+
+        class ResourceController(object):
+
+            def __init__(self, name):
+                self.name = name
+                assert self.name == 'file.html'
+
+            @expose('json')
+            def index(self):
+                return dict(name=self.name)
+
+        class RootController(object):
+
+            @expose()
+            def _lookup(self, name, *remainder):
+                return ResourceController(name), remainder
+
+        app = TestApp(
+            Pecan(RootController(), guess_content_type_from_ext=False)
+        )
+
+        r = app.get('/file.html/')
+        assert r.status_int == 200
+        result = dict(json.loads(r.body.decode()))
+        assert result == {'name': 'file.html'}
+
+        r = app.get('/file.html')
+        assert r.status_int == 302
+        r = r.follow()
+        result = dict(json.loads(r.body.decode()))
+        assert result == {'name': 'file.html'}
 
 
 class TestContentTypeByAcceptHeaders(PecanTestCase):
@@ -1827,6 +1959,18 @@ class TestEngines(PecanTestCase):
         result = dict(json.loads(r.body.decode()))
         assert result == {'name': 'Bill'}
 
+    def test_default_json_renderer_with_explicit_content_type(self):
+
+        class RootController(object):
+            @expose(content_type='text/plain')
+            def index(self, name='Bill'):
+                return name
+
+        app = TestApp(Pecan(RootController(), default_renderer='json'))
+        r = app.get('/')
+        assert r.status_int == 200
+        assert r.body == b_("Bill")
+
 
 class TestDeprecatedRouteMethod(PecanTestCase):
 
@@ -1850,3 +1994,271 @@ class TestDeprecatedRouteMethod(PecanTestCase):
             r = self.app_.get('/foo/bar/')
             assert r.status_int == 200
             assert b_('foo, bar') in r.body
+
+
+class TestExplicitRoute(PecanTestCase):
+
+    def test_alternate_route(self):
+
+        class RootController(object):
+
+            @expose(route='some-path')
+            def some_path(self):
+                return 'Hello, World!'
+
+        app = TestApp(Pecan(RootController()))
+
+        r = app.get('/some-path/')
+        assert r.status_int == 200
+        assert r.body == b_('Hello, World!')
+
+        r = app.get('/some_path/', expect_errors=True)
+        assert r.status_int == 404
+
+    def test_manual_route(self):
+
+        class SubController(object):
+
+            @expose(route='some-path')
+            def some_path(self):
+                return 'Hello, World!'
+
+        class RootController(object):
+            pass
+
+        route(RootController, 'some-controller', SubController())
+
+        app = TestApp(Pecan(RootController()))
+
+        r = app.get('/some-controller/some-path/')
+        assert r.status_int == 200
+        assert r.body == b_('Hello, World!')
+
+        r = app.get('/some-controller/some_path/', expect_errors=True)
+        assert r.status_int == 404
+
+    def test_manual_route_conflict(self):
+
+        class SubController(object):
+            pass
+
+        class RootController(object):
+
+            @expose()
+            def hello(self):
+                return 'Hello, World!'
+
+        self.assertRaises(
+            RuntimeError,
+            route,
+            RootController,
+            'hello',
+            SubController()
+        )
+
+    def test_custom_route_on_index(self):
+
+        class RootController(object):
+
+            @expose(route='some-path')
+            def index(self):
+                return 'Hello, World!'
+
+        app = TestApp(Pecan(RootController()))
+
+        r = app.get('/some-path/')
+        assert r.status_int == 200
+        assert r.body == b_('Hello, World!')
+
+        r = app.get('/')
+        assert r.status_int == 200
+        assert r.body == b_('Hello, World!')
+
+        r = app.get('/index/', expect_errors=True)
+        assert r.status_int == 404
+
+    def test_custom_route_with_attribute_conflict(self):
+
+        class RootController(object):
+
+            @expose(route='mock')
+            def greet(self):
+                return 'Hello, World!'
+
+            @expose()
+            def mock(self):
+                return 'You are not worthy!'
+
+        app = TestApp(Pecan(RootController()))
+
+        self.assertRaises(
+            RuntimeError,
+            app.get,
+            '/mock/'
+        )
+
+    def test_conflicting_custom_routes(self):
+
+        class RootController(object):
+
+            @expose(route='testing')
+            def foo(self):
+                return 'Foo!'
+
+            @expose(route='testing')
+            def bar(self):
+                return 'Bar!'
+
+        app = TestApp(Pecan(RootController()))
+
+        self.assertRaises(
+            RuntimeError,
+            app.get,
+            '/testing/'
+        )
+
+    def test_conflicting_custom_routes_in_subclass(self):
+
+        class BaseController(object):
+
+            @expose(route='testing')
+            def foo(self):
+                return request.path
+
+        class ChildController(BaseController):
+            pass
+
+        class RootController(BaseController):
+            child = ChildController()
+
+        app = TestApp(Pecan(RootController()))
+
+        r = app.get('/testing/')
+        assert r.body == b_('/testing/')
+
+        r = app.get('/child/testing/')
+        assert r.body == b_('/child/testing/')
+
+    def test_custom_route_prohibited_on_lookup(self):
+        try:
+            class RootController(object):
+
+                @expose(route='some-path')
+                def _lookup(self):
+                    return 'Hello, World!'
+        except ValueError:
+            pass
+        else:
+            raise AssertionError(
+                '_lookup cannot be used with a custom path segment'
+            )
+
+    def test_custom_route_prohibited_on_default(self):
+        try:
+            class RootController(object):
+
+                @expose(route='some-path')
+                def _default(self):
+                    return 'Hello, World!'
+        except ValueError:
+            pass
+        else:
+            raise AssertionError(
+                '_default cannot be used with a custom path segment'
+            )
+
+    def test_custom_route_prohibited_on_route(self):
+        try:
+            class RootController(object):
+
+                @expose(route='some-path')
+                def _route(self):
+                    return 'Hello, World!'
+        except ValueError:
+            pass
+        else:
+            raise AssertionError(
+                '_route cannot be used with a custom path segment'
+            )
+
+    def test_custom_route_with_generic_controllers(self):
+
+        class RootController(object):
+
+            @expose(route='some-path', generic=True)
+            def foo(self):
+                return 'Hello, World!'
+
+            @foo.when(method='POST')
+            def handle_post(self):
+                return 'POST!'
+
+        app = TestApp(Pecan(RootController()))
+
+        r = app.get('/some-path/')
+        assert r.status_int == 200
+        assert r.body == b_('Hello, World!')
+
+        r = app.get('/foo/', expect_errors=True)
+        assert r.status_int == 404
+
+        r = app.post('/some-path/')
+        assert r.status_int == 200
+        assert r.body == b_('POST!')
+
+        r = app.post('/foo/', expect_errors=True)
+        assert r.status_int == 404
+
+    def test_custom_route_prohibited_on_generic_controllers(self):
+        try:
+            class RootController(object):
+
+                @expose(generic=True)
+                def foo(self):
+                    return 'Hello, World!'
+
+                @foo.when(method='POST', route='some-path')
+                def handle_post(self):
+                    return 'POST!'
+        except ValueError:
+            pass
+        else:
+            raise AssertionError(
+                'generic controllers cannot be used with a custom path segment'
+            )
+
+    def test_invalid_route_arguments(self):
+        class C(object):
+
+            def secret(self):
+                return {}
+
+        self.assertRaises(TypeError, route)
+        self.assertRaises(TypeError, route, 'some-path', lambda x: x)
+        self.assertRaises(TypeError, route, 'some-path', C.secret)
+        self.assertRaises(TypeError, route, C, {}, C())
+
+        for path in (
+            'VARIED-case-PATH',
+            'this,custom,path',
+            '123-path',
+            'path(with-parens)',
+            'path;with;semicolons',
+            'path:with:colons',
+            'v2.0',
+            '~username',
+            'somepath!',
+            'four*four',
+            'one+two',
+            '@twitterhandle',
+            'package=pecan'
+        ):
+            handler = C()
+            route(C, path, handler)
+            assert getattr(C, path, handler)
+
+        self.assertRaises(ValueError, route, C, '/path/', C())
+        self.assertRaises(ValueError, route, C, '.', C())
+        self.assertRaises(ValueError, route, C, '..', C())
+        self.assertRaises(ValueError, route, C, 'path?', C())
+        self.assertRaises(ValueError, route, C, 'percent%20encoded', C())

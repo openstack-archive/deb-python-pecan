@@ -136,6 +136,64 @@ use the ``text/html`` content type by default.
   * :ref:`pecan_decorators`
 
 
+Specifying Explicit Path Segments
+---------------------------------
+
+Occasionally, you may want to use a path segment in your routing that doesn't
+work with Pecan's declarative approach to routing because of restrictions in
+Python's syntax.  For example, if you wanted to route for a path that includes
+dashes, such as ``/some-path/``, the following is *not* valid Python::
+
+
+    class RootController(object):
+
+        @pecan.expose()
+        def some-path(self):
+            return dict()
+
+To work around this, pecan allows you to specify an explicit path segment in
+the :func:`~pecan.decorators.expose` decorator::
+
+    class RootController(object):
+
+        @pecan.expose(route='some-path')
+        def some_path(self):
+            return dict()
+
+In this example, the pecan application will reply with an ``HTTP 200`` for
+requests made to ``/some-path/``, but requests made to ``/some_path/`` will
+yield an ``HTTP 404``.
+
+:func:`~pecan.routing.route` can also be used explicitly as an alternative to
+the ``route`` argument in :func:`~pecan.decorators.expose`::
+
+    class RootController(object):
+
+        @pecan.expose()
+        def some_path(self):
+            return dict()
+
+    pecan.route('some-path', RootController.some_path)
+
+Routing to child controllers can be handled simliarly by utilizing
+:func:`~pecan.routing.route`::
+
+
+    class ChildController(object):
+
+        @pecan.expose()
+        def child(self):
+            return dict()
+
+    class RootController(object):
+        pass
+
+    pecan.route(RootController, 'child-path', ChildController())
+
+In this example, the pecan application will reply with an ``HTTP 200`` for
+requests made to ``/child-path/child/``.
+
+
 Routing Based on Request Method
 -------------------------------
 
@@ -427,6 +485,60 @@ The same effect can be achieved with HTTP ``POST`` body variables:
     $ curl -X POST "http://localhost:8080/" -H "Content-Type: application/x-www-form-urlencoded" -d "arg=foo"
     foo
 
+Static File Serving
+-------------------
+
+Because Pecan gives you direct access to the underlying
+:class:`~webob.request.Request`, serving a static file download is as simple as
+setting the WSGI ``app_iter`` and specifying the content type::
+
+    import os
+    from random import choice
+
+    from webob.static import FileIter
+
+    from pecan import expose, response
+
+
+    class RootController(object):
+
+        @expose(content_type='image/gif')
+        def gifs(self):
+            filepath = choice((
+                "/path/to/funny/gifs/catdance.gif",
+                "/path/to/funny/gifs/babydance.gif",
+                "/path/to/funny/gifs/putindance.gif"
+            ))
+            f = open(filepath, 'rb')
+            response.app_iter = FileIter(f)
+            response.headers[
+                'Content-Disposition'
+            ] = 'attachment; filename="%s"' % os.path.basename(f.name)
+
+If you don't know the content type ahead of time (for example, if you're
+retrieving files and their content types from a data store), you can specify
+it via ``response.headers`` rather than in the :func:`~pecan.decorators.expose`
+decorator::
+
+    import os
+    from mimetypes import guess_type
+
+    from webob.static import FileIter
+
+    from pecan import expose, response
+
+
+    class RootController(object):
+
+        @expose()
+        def download(self):
+            f = open('/path/to/some/file', 'rb')
+            response.app_iter = FileIter(f)
+            response.headers['Content-Type'] = guess_type(f.name)
+            response.headers[
+                'Content-Disposition'
+            ] = 'attachment; filename="%s"' % os.path.basename(f.name)
+
 Handling File Uploads
 ---------------------
 
@@ -452,6 +564,25 @@ application's controller:
         def upload(self):
             assert isinstance(request.POST['file'], cgi.FieldStorage)
             data = request.POST['file'].file.read()
+
+Thread-Safe Per-Request Storage
+-------------------------------
+
+For convenience, Pecan provides a Python dictionary on every request which can
+be accessed and modified in a thread-safe manner throughout the life-cycle of
+an individual request::
+
+    pecan.request.context['current_user'] = some_user
+    print pecan.request.context.items()
+
+This is particularly useful in situations where you want to store
+metadata/context about a request (e.g., in middleware, or per-routing hooks)
+and access it later (e.g., in controller code).
+
+For more fine-grained control of the request, the underlying WSGI environ for
+a given Pecan request can be accessed and modified via
+``pecan.request.environ``.
+
 
 Helper Functions
 ----------------

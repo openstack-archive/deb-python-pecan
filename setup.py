@@ -3,7 +3,7 @@ import platform
 
 from setuptools import setup, find_packages
 
-version = '0.8.2'
+version = '1.0.2'
 
 #
 # determine requirements
@@ -39,10 +39,15 @@ except:
     # a backported replacement for 2.6 through 3.4
     #
     requirements.append('singledispatch')
+    try:
+        from collections import OrderedDict
+    except:
+        requirements.append('ordereddict')
 
 
 tests_require = requirements + [
     'virtualenv',
+    'Jinja2',
     'gunicorn',
     'mock',
     'sqlalchemy'
@@ -59,9 +64,6 @@ if sys.version_info < (3, 0):
 else:
     # Genshi added Python3 support in 0.7
     tests_require += ['Genshi>=0.7']
-
-if sys.version_info < (3, 0) or sys.version_info >= (3, 3):
-    tests_require += ['Jinja2']
 
 #
 # call setup
@@ -87,7 +89,6 @@ setup(
         'Programming Language :: Python :: 2.6',
         'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.2',
         'Programming Language :: Python :: 3.3',
         'Programming Language :: Python :: 3.4',
         'Programming Language :: Python :: Implementation :: PyPy',
@@ -97,7 +98,7 @@ setup(
     keywords='web framework wsgi object-dispatch http',
     author='Jonathan LaCour',
     author_email='info@pecanpy.org',
-    url='http://github.com/stackforge/pecan',
+    url='http://github.com/pecan/pecan',
     license='BSD',
     packages=find_packages(exclude=['ez_setup', 'examples', 'tests']),
     include_package_data=True,

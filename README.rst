@@ -17,7 +17,7 @@ Installing
 
 ...or, for the latest (unstable) tip::
 
-    $ git clone https://github.com/stackforge/pecan.git
+    $ git clone https://github.com/pecan/pecan.git
     $ cd pecan && python setup.py install
 
 Running Tests
@@ -46,11 +46,11 @@ Viewing Documentation
 Contributing
 ------------
 For information on contributing to Pecan, please read our `Contributing
-Guidelines <https://github.com/stackforge/pecan/blob/master/CONTRIBUTING.rst>`_.
+Guidelines <https://github.com/pecan/pecan/blob/master/CONTRIBUTING.rst>`_.
 
-Bugs should be filed on Launchpad, not GitHub:
+Bugs should be reported at:
 
-https://bugs.launchpad.net/pecan
+https://github.com/pecan/pecan/issues/new
 
 Additional Help/Support
 -----------------------

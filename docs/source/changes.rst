@@ -1,3 +1,69 @@
+1.0.2
+=====
+* Fixed an edge case in `pecan.util.getargspec` that caused the incorrect
+  argspec to be returned in certain situations when using Python 2.6.
+* Added a `threading.lock` to the file system monitoring in `pecan serve
+  --reload` to avoid extraneous server reloads.
+
+1.0.1
+====
+* Fixed a bug wherein the file extension for URLs with a trailing slash
+  (`file.html` vs `file.html/`) were not correctly guessed, thus resulting in
+  incorrect Content-Type headers.
+* Fixed a subtle bug in `pecan.config.Configuration` attribute/item assignment
+  that caused some types of configuration changes to silently fail.
+
+1.0.0
+=====
+* Replaced pecan's debugger middleware with an (optional) dependency on the
+  `backlash` package.  Developers who want to debug application-level
+  tracebacks interactively should `pip install backlash` in their development
+  environment.
+* Fixed a Content-Type related bug: when an explicit content_type is specified
+  as an argument to `pecan.expose()`, it is now given precedence over the
+  application-level default renderer.
+* Fixed a bug that prevented the usage of certain RFC3986-specified characters
+  in path segments.
+* Fixed a bug in `pecan.abort` which suppressed the original traceback (and
+  prevented monitoring tools like NewRelic from working as effectively).
+
+0.9.0
+=====
+* Support for Python 3.2 has been dropped.
+* Added a new feature which allows users to specify custom path segments for
+  controllers.  This is especially useful for path segments that are not
+  valid Python identifiers (such as path segments that include certain
+  punctuation characters, like `/some/~path~/`).
+* Added a new configuration option, `app.debugger`, which allows developers to
+  specify an alternative debugger to `pdb` (e.g., `ipdb`) when performing
+  interactive debugging with pecan's `DebugMiddleware`.
+* Changed new quickstart pecan projects to default the `pecan` log level to
+  `DEBUG` for development.
+* Fixed a bug that prevented `staticmethods` from being used as controllers.
+* Fixed a decoding bug in the way pecan handles certain quoted URL path
+  segments and query strings.
+* Fixed several bugs in the way pecan handles Unicode path segments (for
+  example, now you can define pecan routes that contain emoji characters).
+* Fixed several bugs in RestController that caused it to return `HTTP 404 Not
+  Found` rather than `HTTP 405 Method Not Allowed`.  Additionally,
+  RestController now returns valid `Allow` headers when `HTTP 405 Method Not
+  Allowed` is returned.
+* Fixed a bug which allowed special pecan methods (`_route`, `_lookup`,
+  `_default`) to be marked as generic REST methods.
+* Added more emphasis in pecan's documentation to the need for `debug=False` in
+  production deployments.
+
+0.8.3
+=====
+* Changed pecan to more gracefully handle a few odd request encoding edge
+  cases.  Now pecan applications respond with an HTTP 400 (rather than an
+  uncaught UnicodeDecodeError, resulting in an HTTP 500) when:
+    - HTTP POST requests are composed of non-Unicode data
+    - Request paths contain invalid percent-encoded characters, e.g.,
+      ``/some/path/%aa/``
+* Improved verbosity for import-related errors in pecan configuration files,
+  especially those involving relative imports.
+
 0.8.2
 =====
 * Fixes a bug that breaks support for multi-value query string variables (e.g.,
@@ -105,7 +171,7 @@
 0.4.1
 =====
 * Moved the project to `StackForge infrastructure
-  <http://ci.openstack.org/stackforge.html>`_, including Gerrit code review,
+  <http://docs.openstack.org/infra/system-config/stackforge.html>`_, including Gerrit code review,
   Jenkins continuous integration, and GitHub mirroring.
 * Added a pecan plugin for the popular `uwsgi server
   <http://uwsgi-docs.readthedocs.org>`_.

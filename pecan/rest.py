@@ -1,4 +1,4 @@
-from inspect import ismethod
+from inspect import ismethod, getmembers
 import warnings
 
 from webob import exc
@@ -26,6 +26,35 @@ class RestController(object):
     :ref:`rest`.
     '''
     _custom_actions = {}
+
+    def __new__(cls, *args, **kwargs):
+        """
+        RestController does not support the `route` argument to
+        :func:`~pecan.decorators.expose`
+
+        Implement this with __new__ rather than a metaclass, because it's very
+        common for pecan users to mixin RestController (with other bases that
+        have their own metaclasses).
+        """
+        for name, value in getmembers(cls):
+            if iscontroller(value) and getattr(value, 'custom_route', None):
+                raise ValueError(
+                    'Path segments cannot be used in combination with '
+                    'pecan.rest.RestController.  Remove the `route` argument '
+                    'to @pecan.expose on %s.%s.%s' % (
+                        cls.__module__, cls.__name__, value.__name__
+                    )
+                )
+
+        # object.__new__ will error if called with extra arguments, and either
+        # __new__ is overridden or __init__ is not overridden;
+        # https://hg.python.org/cpython/file/78d36d54391c/Objects/typeobject.c#l3034
+        # In PY3, this is actually a TypeError (in PY2, it just raises
+        # a DeprecationWarning)
+        new = super(RestController, cls).__new__
+        if new is object.__new__:
+            return new(cls)
+        return new(cls, *args, **kwargs)
 
     def _get_args_for_controller(self, controller):
         """
@@ -58,6 +87,17 @@ class RestController(object):
             # (e.g., /authors/books vs /authors/1/books), return a 404 for an
             # invalid path.
             abort(404)
+
+    def _lookup_child(self, remainder):
+        """
+        Lookup a child controller with a named path (handling Unicode paths
+        properly for Python 2).
+        """
+        try:
+            controller = getattr(self, remainder, None)
+        except UnicodeEncodeError:
+            return None
+        return controller
 
     @expose()
     def _route(self, args, request=None):
@@ -105,14 +145,33 @@ class RestController(object):
                 _lookup_result = self._handle_lookup(args, request)
                 if _lookup_result:
                     return _lookup_result
-        except (exc.HTTPClientError, exc.HTTPNotFound):
+        except (exc.HTTPClientError, exc.HTTPNotFound,
+                exc.HTTPMethodNotAllowed) as e:
             #
-            # If the matching handler results in a 400 or 404, attempt to
+            # If the matching handler results in a 400, 404, or 405, attempt to
             # handle a _lookup method (if it exists)
             #
             _lookup_result = self._handle_lookup(args, request)
             if _lookup_result:
                 return _lookup_result
+
+            # Build a correct Allow: header
+            if isinstance(e, exc.HTTPMethodNotAllowed):
+
+                def method_iter():
+                    for func in ('get', 'get_one', 'get_all', 'new', 'edit',
+                                 'get_delete'):
+                        if self._find_controller(func):
+                            yield 'GET'
+                            break
+                    for method in ('HEAD', 'POST', 'PUT', 'DELETE', 'TRACE',
+                                   'PATCH'):
+                        func = method.lower()
+                        if self._find_controller(func):
+                            yield method
+
+                e.allow = sorted(method_iter())
+
             raise
 
         # return the result
@@ -138,7 +197,7 @@ class RestController(object):
         Returns the appropriate controller for routing a custom action.
         '''
         for name in args:
-            obj = getattr(self, name, None)
+            obj = self._lookup_child(name)
             if obj and iscontroller(obj):
                 return obj
         return None
@@ -167,7 +226,7 @@ class RestController(object):
         # attempt to locate a sub-controller
         if var_args:
             for i, item in enumerate(remainder):
-                controller = getattr(self, item, None)
+                controller = self._lookup_child(item)
                 if controller and not ismethod(controller):
                     self._set_routing_args(request, remainder[:i])
                     return lookup_controller(controller, remainder[i + 1:],
@@ -175,7 +234,7 @@ class RestController(object):
         elif fixed_args < len(remainder) and hasattr(
             self, remainder[fixed_args]
         ):
-            controller = getattr(self, remainder[fixed_args])
+            controller = self._lookup_child(remainder[fixed_args])
             if not ismethod(controller):
                 self._set_routing_args(request, remainder[:fixed_args])
                 return lookup_controller(
@@ -201,12 +260,12 @@ class RestController(object):
         if remainder:
             if self._find_controller(remainder[0]):
                 abort(405)
-            sub_controller = getattr(self, remainder[0], None)
+            sub_controller = self._lookup_child(remainder[0])
             if sub_controller:
                 return lookup_controller(sub_controller, remainder[1:],
                                          request)
 
-        abort(404)
+        abort(405)
 
     def _handle_get(self, method, remainder, request=None):
         '''
@@ -222,7 +281,7 @@ class RestController(object):
             if controller:
                 self._handle_bad_rest_arguments(controller, remainder, request)
                 return controller, []
-            abort(404)
+            abort(405)
 
         method_name = remainder[-1]
         # check for new/edit/delete GET requests
@@ -237,7 +296,7 @@ class RestController(object):
         if match:
             return match
 
-        controller = getattr(self, remainder[0], None)
+        controller = self._lookup_child(remainder[0])
         if controller and not ismethod(controller):
             return lookup_controller(controller, remainder[1:], request)
 
@@ -247,7 +306,7 @@ class RestController(object):
             self._handle_bad_rest_arguments(controller, remainder, request)
             return controller, remainder
 
-        abort(404)
+        abort(405)
 
     def _handle_delete(self, method, remainder, request=None):
         '''
@@ -261,7 +320,7 @@ class RestController(object):
             if match:
                 return match
 
-            controller = getattr(self, remainder[0], None)
+            controller = self._lookup_child(remainder[0])
             if controller and not ismethod(controller):
                 return lookup_controller(controller, remainder[1:], request)
 
@@ -275,12 +334,12 @@ class RestController(object):
         if remainder:
             if self._find_controller(remainder[0]):
                 abort(405)
-            sub_controller = getattr(self, remainder[0], None)
+            sub_controller = self._lookup_child(remainder[0])
             if sub_controller:
                 return lookup_controller(sub_controller, remainder[1:],
                                          request)
 
-        abort(404)
+        abort(405)
 
     def _handle_post(self, method, remainder, request=None):
         '''
@@ -295,7 +354,7 @@ class RestController(object):
             if match:
                 return match
 
-            controller = getattr(self, remainder[0], None)
+            controller = self._lookup_child(remainder[0])
             if controller and not ismethod(controller):
                 return lookup_controller(controller, remainder[1:], request)
 
@@ -304,7 +363,7 @@ class RestController(object):
         if controller:
             return controller, remainder
 
-        abort(404)
+        abort(405)
 
     def _handle_put(self, method, remainder, request=None):
         return self._handle_post(method, remainder, request)

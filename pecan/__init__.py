@@ -4,13 +4,16 @@ from .core import (
 )
 from .decorators import expose
 from .hooks import RequestViewerHook
+
 from .middleware.debug import DebugMiddleware
 from .middleware.errordocument import ErrorDocumentMiddleware
 from .middleware.recursive import RecursiveMiddleware
 from .middleware.static import StaticFileMiddleware
+from .routing import route
 
 from .configuration import set_config, Config
 from .configuration import _runtime_conf as conf
+from . import middleware
 
 try:
     from logging.config import dictConfig as load_logging_config
@@ -23,7 +26,7 @@ import warnings
 __all__ = [
     'make_app', 'load_app', 'Pecan', 'Request', 'Response', 'request',
     'response', 'override_template', 'expose', 'conf', 'set_config', 'render',
-    'abort', 'redirect'
+    'abort', 'redirect', 'route'
 ]
 
 
@@ -90,19 +93,28 @@ def make_app(root, **kw):
     # Configuration for serving custom error messages
     errors = kw.get('errors', getattr(conf.app, 'errors', {}))
     if errors:
-        app = ErrorDocumentMiddleware(app, errors)
+        app = middleware.errordocument.ErrorDocumentMiddleware(app, errors)
 
     # Included for internal redirect support
-    app = RecursiveMiddleware(app)
+    app = middleware.recursive.RecursiveMiddleware(app)
 
-    # When in debug mode, load our exception dumping middleware
+    # When in debug mode, load exception debugging middleware
     static_root = kw.get('static_root', None)
     if debug:
-        app = DebugMiddleware(app)
+        debug_kwargs = getattr(conf, 'debug', {})
+        debug_kwargs.setdefault('context_injectors', []).append(
+            lambda environ: {
+                'request': environ.get('pecan.locals', {}).get('request')
+            }
+        )
+        app = DebugMiddleware(
+            app,
+            **debug_kwargs
+        )
 
         # Support for serving static files (for development convenience)
         if static_root:
-            app = StaticFileMiddleware(app, static_root)
+            app = middleware.static.StaticFileMiddleware(app, static_root)
 
     elif static_root:
         warnings.warn(

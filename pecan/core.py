@@ -8,25 +8,26 @@ from mimetypes import guess_type, add_type
 from os.path import splitext
 import logging
 import operator
+import sys
 import types
 
 import six
-if six.PY3:
-    from .compat import is_bound_method as ismethod
-else:
-    from inspect import ismethod
 
 from webob import (Request as WebObRequest, Response as WebObResponse, exc,
                    acceptparse)
 from webob.multidict import NestedMultiDict
 
-from .compat import urlparse, unquote_plus, izip
+from .compat import urlparse, izip
 from .secure import handle_security
 from .templating import RendererFactory
 from .routing import lookup_controller, NonCanonicalPath
 from .util import _cfg, encode_if_needed, getargspec
 from .middleware.recursive import ForwardRequestException
 
+if six.PY3:
+    from .compat import is_bound_method as ismethod
+else:
+    from inspect import ismethod
 
 # make sure that json is defined in mimetypes
 add_type('application/json', '.json', True)
@@ -48,7 +49,13 @@ class RoutingState(object):
 
 
 class Request(WebObRequest):
-    pass
+
+    def __getattribute__(self, name):
+        try:
+            return WebObRequest.__getattribute__(self, name)
+        except UnicodeDecodeError as e:
+            logger.exception(e)
+            abort(400)
 
 
 class Response(WebObResponse):
@@ -106,7 +113,7 @@ def override_template(template, content_type=None):
         request.pecan['override_content_type'] = content_type
 
 
-def abort(status_code=None, detail='', headers=None, comment=None, **kw):
+def abort(status_code, detail='', headers=None, comment=None, **kw):
     '''
     Raise an HTTP status code, as specified. Useful for returning status
     codes like 401 Unauthorized or 403 Forbidden.
@@ -117,12 +124,24 @@ def abort(status_code=None, detail='', headers=None, comment=None, **kw):
     :param comment: A comment to include in the response.
     '''
 
-    raise exc.status_map[status_code](
-        detail=detail,
-        headers=headers,
-        comment=comment,
-        **kw
-    )
+    # If there is a traceback, we need to catch it for a re-raise
+    try:
+        _, _, traceback = sys.exc_info()
+        webob_exception = exc.status_map[status_code](
+            detail=detail,
+            headers=headers,
+            comment=comment,
+            **kw
+        )
+
+        if six.PY3:
+            raise webob_exception.with_traceback(traceback)
+        else:
+            # Using exec to avoid python 3 parsers from crashing
+            exec('raise webob_exception, None, traceback')
+    finally:
+        # Per the suggestion of the Python docs, delete the traceback object
+        del traceback
 
 
 def redirect(location=None, internal=False, code=None, headers={},
@@ -337,14 +356,12 @@ class PecanBase(object):
         args = []
         varargs = []
         kwargs = dict()
-        valid_args = argspec.args[1:]  # pop off `self`
+        valid_args = argspec.args[:]
+        if ismethod(state.controller) or im_self:
+            valid_args.pop(0)  # pop off `self`
         pecan_state = state.request.pecan
 
-        def _decode(x):
-            return unquote_plus(x) if isinstance(x, six.string_types) \
-                else x
-
-        remainder = [_decode(x) for x in remainder if x]
+        remainder = [x for x in remainder if x]
 
         if im_self is not None:
             args.append(im_self)
@@ -390,18 +407,19 @@ class PecanBase(object):
         return args, varargs, kwargs
 
     def render(self, template, namespace):
-        renderer = self.renderers.get(
-            self.default_renderer,
-            self.template_path
-        )
         if template == 'json':
             renderer = self.renderers.get('json', self.template_path)
-        if ':' in template:
+        elif ':' in template:
+            renderer_name, template = template.split(':', 1)
             renderer = self.renderers.get(
-                template.split(':')[0],
+                renderer_name,
                 self.template_path
             )
-            template = template.split(':')[1]
+        else:
+            renderer = self.renderers.get(
+                self.default_renderer,
+                self.template_path
+            )
         return renderer.render(template, namespace)
 
     def find_controller(self, state):
@@ -414,7 +432,7 @@ class PecanBase(object):
 
         # store the routing path for the current application to allow hooks to
         # modify it
-        pecan_state['routing_path'] = path = req.encget('PATH_INFO')
+        pecan_state['routing_path'] = path = req.path_info
 
         # handle "on_route" hooks
         self.handle_hooks(self.hooks, 'on_route', state)
@@ -427,13 +445,13 @@ class PecanBase(object):
         if self.guess_content_type_from_ext \
                 and not pecan_state['content_type'] \
                 and '.' in path:
-            new_path, extension = splitext(path)
+            _, extension = splitext(path.rstrip('/'))
 
             # preface with a letter to ensure compat for 2.5
             potential_type = guess_type('x' + extension)[0]
 
-            if potential_type is not None:
-                path = new_path
+            if extension and potential_type is not None:
+                path = ''.join(path.rsplit(extension, 1))
                 pecan_state['extension'] = extension
                 pecan_state['content_type'] = potential_type
 
@@ -529,7 +547,7 @@ class PecanBase(object):
         # handle "before" hooks
         self.handle_hooks(self.determine_hooks(controller), 'before', state)
 
-        return controller, args+varargs, kwargs
+        return controller, args + varargs, kwargs
 
     def invoke_controller(self, controller, args, kwargs, state):
         '''
@@ -567,9 +585,11 @@ class PecanBase(object):
         template = content_types.get(pecan_state['content_type'])
 
         # check if for controller override of template
-        template = pecan_state.get('override_template', template) or (
-            'json' if self.default_renderer == 'json' else None
-        )
+        template = pecan_state.get('override_template', template)
+        if template is None and cfg['explicit_content_type'] is False:
+            if self.default_renderer == 'json':
+                template = 'json'
+
         pecan_state['content_type'] = pecan_state.get(
             'override_content_type',
             pecan_state['content_type']
@@ -642,6 +662,10 @@ class PecanBase(object):
         req = self.request_cls(environ)
         resp = self.response_cls()
         state = RoutingState(req, resp, self)
+        environ['pecan.locals'] = {
+            'request': req,
+            'response': resp
+        }
         controller = None
 
         # handle the request
