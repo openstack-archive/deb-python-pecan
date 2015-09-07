@@ -23,6 +23,7 @@ Build-Depends-Indep: gunicorn,
                      python-six,
                      python-sqlalchemy,
                      python-unittest2,
+                     python-virtualenv,
                      python-webob,
                      python-webtest,
                      python3-genshi,
@@ -37,7 +38,8 @@ Build-Depends-Indep: gunicorn,
                      python3-six,
                      python3-sqlalchemy,
                      python3-webob,
-                     python3-webtest
+                     python3-webtest,
+                     python3-virtualenv,
 Standards-Version: 3.9.6
 Vcs-Browser: http://anonscm.debian.org/gitweb/?p=openstack/python-pecan.git
 Vcs-Git: git://anonscm.debian.org/openstack/python-pecan.git
