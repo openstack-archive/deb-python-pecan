@@ -1,8 +1,12 @@
-python-pecan (0.8.2-2) UNRELEASED; urgency=medium
+python-pecan (1.0.2-1) experimental; urgency=medium
 
+  [ James Page ]
   * Update watch file to use correct location in github.
 
- -- James Page <james.page@ubuntu.com>  Fri, 22 May 2015 12:29:13 -0700
+  [ Thomas Goirand ]
+  * New upstream release.
+
+ -- Thomas Goirand <zigo@debian.org>  Mon, 07 Sep 2015 23:49:03 +0200
 
 python-pecan (0.8.2-1) unstable; urgency=medium
 
