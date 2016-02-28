@@ -44,7 +44,7 @@ Build-Depends-Indep: gunicorn,
 Standards-Version: 3.9.6
 Vcs-Browser: http://anonscm.debian.org/gitweb/?p=openstack/python-pecan.git
 Vcs-Git: git://anonscm.debian.org/openstack/python-pecan.git
-Homepage: http://pypi.python.org/pypi/pecan
+Homepage: https://pypi.python.org/pypi/pecan
 
 Package: python-pecan
 Architecture: all
