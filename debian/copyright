@@ -1,6 +1,6 @@
 Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: pecan
-Source: git://github.com/pecan/pecan.git
+Source: https://github.com/pecan/pecan
 
 Files: debian/*
 Copyright: (c) 2012, Thomas Goirand <zigo@debian.org>
