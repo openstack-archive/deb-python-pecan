@@ -46,7 +46,7 @@ ifeq (,$(findstring nocheck, $(DEB_BUILD_OPTIONS)))
 		python$$pyvers setup.py test -v ; \
 	done
 	set -e && for pyvers in $(PYTHON3S) ; do \
-		python$$pyvers setup.py test -v || true ; \
+		python$$pyvers setup.py test -v ; \
 	done
 endif
 
