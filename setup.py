@@ -3,7 +3,7 @@ import platform
 
 from setuptools import setup, find_packages
 
-version = '1.0.3'
+version = '1.1.2'
 
 #
 # determine requirements
@@ -91,6 +91,7 @@ setup(
         'Programming Language :: Python :: 3',
         'Programming Language :: Python :: 3.3',
         'Programming Language :: Python :: 3.4',
+        'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: Implementation :: PyPy',
         'Topic :: Internet :: WWW/HTTP :: WSGI',
         'Topic :: Software Development :: Libraries :: Application Frameworks'

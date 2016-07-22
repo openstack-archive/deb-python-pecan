@@ -70,32 +70,57 @@ route to the following controller methods:
              └── BooksController.index
                 └── BooksController.bestsellers
 
+
 Exposing Controllers
 --------------------
 
 You tell Pecan which methods in a class are publically-visible via
 :func:`~pecan.decorators.expose`. If a method is *not* decorated with
 :func:`~pecan.decorators.expose`, Pecan will never route a request to it.
-:func:`~pecan.decorators.expose` accepts three optional parameters, some of
-which can impact routing and the content type of the response body.
+
+:func:`~pecan.decorators.expose` can be used in a variety of ways.  The
+simplest case involves passing no arguments.  In this scenario, the controller
+returns a string representing the HTML response body.
 
 ::
 
     from pecan import expose
 
     class RootController(object):
-        @expose(
-            template        = None,
-            content_type    = 'text/html',
-            generic         = False
-        )
+        @expose()
         def hello(self):
             return 'Hello World'
 
 
-Let's look at an example using ``template`` and ``content_type``:
+A more common use case is to :ref:`specify a template and a namespace
+<templates>`::
+
+    from pecan import expose
+
+    class RootController(object):
+        @expose('html_template.mako')
+        def hello(self):
+            return {'msg': 'Hello!'}
 
 ::
+
+    <!-- html_template.mako -->
+    <html>
+        <body>${msg}</body>
+    </html>
+
+Pecan also has built-in support for a special :ref:`JSON renderer
+<expose_json>`, which translates template namespaces into rendered JSON text::
+
+    from pecan import expose
+
+    class RootController(object):
+        @expose('json')
+        def hello(self):
+            return {'msg': 'Hello!'}
+
+:func:`~pecan.decorators.expose` calls can also be stacked, which allows you to
+serialize content differently depending on how the content is requested::
 
     from pecan import expose
 
@@ -114,14 +139,15 @@ different arguments.
         @expose('json')
 
 The first tells Pecan to serialize the response namespace using JSON
-serialization when the client requests ``/hello.json``.
+serialization when the client requests ``/hello.json`` or if an
+``Accept: application/json`` header is present.
 
 ::
 
         @expose('text_template.mako', content_type='text/plain')
 
 The second tells Pecan to use the ``text_template.mako`` template file when the
-client requests ``/hello.txt``.
+client requests ``/hello.txt`` or asks for text/plain via an ``Accept`` header.
 
 ::
 
@@ -129,7 +155,8 @@ client requests ``/hello.txt``.
 
 The third tells Pecan to use the ``html_template.mako`` template file when the
 client requests ``/hello.html``. If the client requests ``/hello``, Pecan will
-use the ``text/html`` content type by default.
+use the ``text/html`` content type by default; in the absense of an explicit
+content type, Pecan assumes the client wants HTML.
 
 .. seealso::
 
@@ -221,8 +248,6 @@ HTTP ``POST``) using `generic controllers`:
             return dict(uuid=uuid)
 
 
-
-
 Pecan's Routing Algorithm
 -------------------------
 
@@ -276,6 +301,7 @@ method matches the URL and there is no :func:`_default` method.
 
 An HTTP GET request to ``/8/name`` would return the name of the student
 where ``primary_key == 8``.
+
 
 Falling Back with ``_default``
 ------------------------------
@@ -394,7 +420,6 @@ If you'd like to return an explicit response, you can do so using
             return Response('Hello, World!', 202)
 
 
-
 Extending Pecan's Request and Response Object
 ---------------------------------------------
 
@@ -422,6 +447,7 @@ and modify your application configuration to use them::
         'request_cls': MyRequest,
         'response_cls': MyResponse
     }
+
 
 Mapping Controller Arguments
 ----------------------------
@@ -485,6 +511,7 @@ The same effect can be achieved with HTTP ``POST`` body variables:
     $ curl -X POST "http://localhost:8080/" -H "Content-Type: application/x-www-form-urlencoded" -d "arg=foo"
     foo
 
+
 Static File Serving
 -------------------
 
@@ -539,6 +566,7 @@ decorator::
                 'Content-Disposition'
             ] = 'attachment; filename="%s"' % os.path.basename(f.name)
 
+
 Handling File Uploads
 ---------------------
 
@@ -564,6 +592,7 @@ application's controller:
         def upload(self):
             assert isinstance(request.POST['file'], cgi.FieldStorage)
             data = request.POST['file'].file.read()
+
 
 Thread-Safe Per-Request Storage
 -------------------------------
@@ -595,3 +624,42 @@ internal or ``HTTP 302`` redirects.
 
   The :func:`redirect` utility, along with several other useful
   helpers, are documented in :ref:`pecan_core`.
+
+
+Determining the URL for a Controller
+------------------------------------
+Given the ability for routing to be drastically changed at runtime, it is not
+always possible to correctly determine a mapping between a controller method
+and a URL.
+
+For example, in the following code that makes use of :func:`_lookup` to alter
+the routing depending on a condition::
+
+
+    from pecan import expose, abort
+    from somelib import get_user_region
+
+
+    class DefaultRegionController(object):
+
+        @expose()
+        def name(self):
+            return "Default Region"
+
+    class USRegionController(object):
+
+        @expose()
+        def name(self):
+            return "US Region"
+
+    class RootController(object):
+        @expose()
+        def _lookup(self, user_id, *remainder):
+            if get_user_region(user_id) == 'us':
+                return USRegionController(), remainder
+            else:
+                return DefaultRegionController(), remainder
+
+This logic depends on the geolocation of a given user and returning
+a completely different class given the condition. A helper to determine what
+URL ``USRegionController.name`` belongs to would fail to do it correctly.

@@ -2,7 +2,7 @@ __CONFIG_HELP__ = '''
 <div class="traceback">
   <b>To disable this interface, set </b>
   <a target="window"
-  href="https://pecan.readthedocs.org/en/latest/deployment.html#disabling-debug-mode">
+  href="https://pecan.readthedocs.io/en/latest/deployment.html#disabling-debug-mode">
     <pre>conf.app.debug = False</pre>
   </a>
 </div>
@@ -10,20 +10,22 @@ __CONFIG_HELP__ = '''
 
 try:
     import re
+    from six import b
     from backlash.debug import DebuggedApplication
 
     class DebugMiddleware(DebuggedApplication):
 
-        body_re = re.compile('(<body[^>]*>)', re.I)
+        body_re = re.compile(b('(<body[^>]*>)'), re.I)
 
         def debug_application(self, environ, start_response):
             for part in super(DebugMiddleware, self).debug_application(
                 environ, start_response
             ):
-                yield self.body_re.sub('\g<1>%s' % __CONFIG_HELP__, part)
+                yield self.body_re.sub(b('\g<1>%s' % __CONFIG_HELP__), part)
 
 
 except ImportError:
+    import logging
     from traceback import print_exc
     from pprint import pformat
 
@@ -31,6 +33,8 @@ except ImportError:
     from six.moves import cStringIO as StringIO
     from webob import Response
     from webob.exc import HTTPException
+
+    LOG = logging.getLogger(__file__)
 
     debug_template_raw = '''<html>
      <head>
@@ -76,6 +80,7 @@ except ImportError:
                 # get a formatted exception
                 out = StringIO()
                 print_exc(file=out)
+                LOG.exception(exc)
 
                 # get formatted WSGI environment
                 formatted_environ = pformat(environ)

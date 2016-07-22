@@ -1,3 +1,41 @@
+1.1.2
+=====
+* Fixed a bug where JSON-formatted HTTP response bodies were not making
+  use of pecan's JSON type registration functionality
+  (http://pecan.readthedocs.io/en/latest/jsonify.html)
+  (https://github.com/pecan/pecan/issues/68).
+* Updated code and documentation examples to support readthedoc's move from
+  `readthedocs.org` to `readthedocs.io`.
+
+1.1.1
+=====
+* Pecan now officially supports Python 3.5.
+* Pecan now uses `inspect.signature` instead of `inspect.getargspec` in
+  Python 3.5 and higher (because `inspect.getargspec` is deprecated in these
+  versions of Python 3).
+* Fixed a bug that caused "after" hooks to run multiple times when
+  `pecan.redirect(..., internal=True)` was used
+  (https://github.com/pecan/pecan/issues/58).
+
+1.1.0
+=====
+* `pecan.middleware.debug.DebugMiddleware` now logs exceptions at the ERROR
+  level (https://github.com/pecan/pecan/pull/56).
+* Fix a Javascript bug in the default project scaffold
+  (https://github.com/pecan/pecan/pull/55).
+
+1.0.5
+=====
+* Fix a bug in controller argspec detection when class-based decorators are
+  used (https://github.com/pecan/pecan/issues/47).
+
+1.0.4
+=====
+* Removed an open file handle leak when pecan renders errors for Jinja2 and
+  Genshi templates (https://github.com/pecan/pecan/issues/30).
+* Resolved a bug which caused log output to be duplicated in projects created
+  with `pecan create` (https://github.com/pecan/pecan/issues/39).
+
 1.0.3
 =====
 * Fixed a bug in `pecan.hooks.HookController` for newer versions of Python3.4
@@ -179,7 +217,7 @@
   <http://docs.openstack.org/infra/system-config/stackforge.html>`_, including Gerrit code review,
   Jenkins continuous integration, and GitHub mirroring.
 * Added a pecan plugin for the popular `uwsgi server
-  <http://uwsgi-docs.readthedocs.org>`_.
+  <https://uwsgi-docs.readthedocs.io>`_.
 * Replaced the ``simplegeneric`` dependency with the new
   ``functools.singledispatch`` function in preparation for  Python 3.4 support.
 * Optimized pecan's core dispatch routing for notably faster response times.

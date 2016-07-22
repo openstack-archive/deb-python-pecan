@@ -30,6 +30,7 @@ env:
   - TOXENV=gnocchi-tip
   - TOXENV=ironic-stable
   - TOXENV=ironic-tip
+  - TOXENV=neutron-stable
   - TOXENV=neutron-tip
   - TOXENV=magnum-stable
   - TOXENV=magnum-tip
@@ -45,9 +46,27 @@ script:
 matrix:
   allow_failures:
     - env: TOXENV=barbican-stable
+    - env: TOXENV=barbican-tip
     - env: TOXENV=ceilometer-stable
     - env: TOXENV=designate-stable
+    - env: TOXENV=designate-tip
     - env: TOXENV=gnocchi-stable
+    - env: TOXENV=neutron-stable
     - env: TOXENV=ironic-stable
     - env: TOXENV=magnum-stable
     - env: TOXENV=wsme-stable
+  include:
+    - python: 3.5
+      env:
+      - TOXENV=py35
+    - python: 3.5
+      env:
+      - TOXENV=scaffolds-35
+    - python: 3.5
+      env:
+      - TOXENV=scaffolds-35-rest-api
+
+notifications:
+  irc:
+    channels:
+      - "chat.freenode.net#pecanpy"
