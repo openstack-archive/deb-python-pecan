@@ -1,4 +1,4 @@
-python-pecan (1.1.2-1) UNRELEASED; urgency=medium
+python-pecan (1.1.2-1) experimental; urgency=medium
 
   [ Ondřej Nový ]
   * Fixed homepage (https).
@@ -11,7 +11,12 @@ python-pecan (1.1.2-1) UNRELEASED; urgency=medium
   * d/rules: Allow python3 unit tests to fail the build, now that Python
     3.5 is supported upstream.
 
- -- James Page <james.page@ubuntu.com>  Fri, 22 Jul 2016 14:29:38 +0100
+  [ Thomas Goirand ]
+  * Using OpenStack's Gerrit as VCS URLs.
+  * Standards-Version: 3.9.8 (no change).
+  * Add a .gitreview file to point at packaging-deb Gerrit.
+
+ -- Thomas Goirand <zigo@debian.org>  Wed, 14 Sep 2016 13:54:34 +0200
 
 python-pecan (1.0.3-1) experimental; urgency=medium
 
