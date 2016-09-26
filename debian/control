@@ -42,8 +42,8 @@ Build-Depends-Indep: gunicorn,
                      python3-webtest,
                      python3-virtualenv,
 Standards-Version: 3.9.8
-Vcs-Browser: https://git.openstack.org/cgit/openstack/deb-python-pecan
-Vcs-Git: https://git.openstack.org/openstack/deb-python-pecan
+Vcs-Browser: https://git.openstack.org/cgit/openstack/deb-python-pecan?h=debian%2Fnewton
+Vcs-Git: https://git.openstack.org/openstack/deb-python-pecan -b debian/newton
 Homepage: https://pypi.python.org/pypi/pecan
 
 Package: python-pecan
